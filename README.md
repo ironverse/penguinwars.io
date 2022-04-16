@@ -41,3 +41,6 @@ wasm-bindgen --out-name penguinwars-io --out-dir www --target web target/wasm32-
 # cargo install basic-http-server
 basic-http-server www
 ```
+
+
+Join us on Discord: https://discord.gg/AwRQGhvfnh
