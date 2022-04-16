@@ -32,14 +32,14 @@ cargo install wasm-bindgen-cli
 
 ```
 cargo build --release --target wasm32-unknown-unknown
-wasm-bindgen --out-name penguinwars-io --out-dir www --target web target/wasm32-unknown-unknown/release/penguinwars-io.wasm
+wasm-bindgen --out-name penguinwars-io --out-dir assets --target web target/wasm32-unknown-unknown/release/penguinwars-io.wasm
 ```
 
 ## Run
 
 ```
 # cargo install basic-http-server
-basic-http-server www
+basic-http-server .
 ```
 
 
