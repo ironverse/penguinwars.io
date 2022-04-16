@@ -20,3 +20,24 @@ Unchecked means not yet implemented.
 - [ ] Destroy enemy structures to steal their resources
 - [ ] Team up with other players by creating or joining a faction
 - [ ] Rent out your puffies to earn revenue while they aren't in use. Don't have a puffy? Rent one instead of buying one.
+
+## Project Setup
+
+```
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli
+```
+
+## Compile
+
+```
+cargo build --release --target wasm32-unknown-unknown
+wasm-bindgen --out-name penguinwars-io --out-dir www --target web target/wasm32-unknown-unknown/release/penguinwars-io.wasm
+```
+
+## Run
+
+```
+# cargo install basic-http-server
+basic-http-server www
+```
