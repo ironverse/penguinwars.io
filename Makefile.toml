@@ -1,5 +1,5 @@
 [tasks.web]
-dependencies = ["compile", "client"]
+dependencies = ["web-wasm-bindgen-cli", "compile", "client"]
 
 [tasks.compile]
 script = '''
@@ -11,3 +11,6 @@ wasm-bindgen --out-name penguinwars-io --out-dir assets --target web target/wasm
 script = '''
 basic-http-server .
 '''
+
+[tasks.web-wasm-bindgen-cli]
+install_crate = {crate_name = "wasm-bindgen-cli", binary = "wasm-bindgen", test_arg="--help", version="0.2.80"}  
