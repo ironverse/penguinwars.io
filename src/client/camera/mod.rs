@@ -1,6 +1,10 @@
 use bevy::input::mouse::{MouseMotion, MouseButtonInput};
 use bevy::prelude::*;
 
+/*
+  Third person camera
+*/
+
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
@@ -13,6 +17,8 @@ impl Plugin for CustomPlugin {
       .add_system(input)
       .add_system(rotate)
       .add_system(mouse_motion_system)
+      .add_system(movement)
+      .add_system(cam_move)
       ;
   }
 }
@@ -68,10 +74,51 @@ fn rotate(
     let yaw_radians = settings.yaw.to_radians();
     let pitch_radians = settings.pitch.to_radians();
 
-    trans.rotation =
-      Quat::from_axis_angle(Vec3::Y, yaw_radians) * Quat::from_axis_angle(-Vec3::X, pitch_radians);
+    // trans.rotation =
+    //   Quat::from_axis_angle(Vec3::Y, yaw_radians) * Quat::from_axis_angle(-Vec3::X, pitch_radians);
+
+    /*
+      Position the camera based on the yaw degrees
+      Set the camera view to focus on player(For now [0, 0, 0])
+    */
+
+    let reverse_lookat = rot_to_look_at(Vec3::new(pitch_radians, yaw_radians, 0.0)) ;
+    info!("f {:?}", reverse_lookat);
+    let target = Vec3::new(0.0, 0.0, 0.0);
+    // let mut cam_pos = Vec3::new(-10.0, 0.5, 0.0);
+    let cam_pos = target + (reverse_lookat * 5.0);
+    
+    let new = Transform::from_xyz(cam_pos[0], cam_pos[1], cam_pos[2])
+      .looking_at(target, Vec3::Y);
+
+
+    trans.translation = new.translation;
+    trans.rotation = new.rotation;
+    trans.scale = new.scale;
   }
 }
+
+fn movement(
+  key_input: Res<Input<KeyCode>>,
+  mut anchors: Query<(&Transform, &mut Anchor)>
+) {
+  for (trans, mut anchor) in anchors.iter_mut() {
+    anchor.0 = trans.translation.clone();
+  }
+}
+
+fn cam_move(
+  anchors: Query<&Anchor>,
+  mut cameras: Query<(&mut Transform, &CameraSettings)>
+) {
+  for a in anchors.iter() {
+    for (mut trans, settings) in cameras.iter_mut() {
+
+    }
+  }
+}
+
+
 
 /* Setting Mouse settings, have to change name later */
 fn mouse_motion_system(
@@ -80,7 +127,6 @@ fn mouse_motion_system(
   mut mouse_motion_events: EventReader<MouseMotion>,
   mut ev_mousebtn: EventReader<MouseButtonInput>,
   mut ev_cursor: EventReader<CursorMoved>,
-  // fs_res: Res<WasmMouseTracker>,
 
   mut cam_settings: Query<&mut CameraSettings>
 ) {
@@ -88,11 +134,6 @@ fn mouse_motion_system(
   for event in mouse_motion_events.iter() {
     delta += event.delta;
   }
-
-  // if fs_res.fullscreen {
-  //   delta.x += fs_res.dx;
-  //   delta.y += fs_res.dy
-  // }
 
   for ev_mouse in ev_mousebtn.iter() {
     if ev_mouse.state.is_pressed() && ev_mouse.button == MouseButton::Left {
@@ -110,18 +151,22 @@ fn mouse_motion_system(
       return;
     }
     delta = ev.position - state.last_cursor_pos;
-    delta.y *= -1.0;
+    // delta.y *= -1.0;
+    delta.x *= -1.0;
     state.last_cursor_pos = ev.position;
+
+
+    for (mut settings) in cam_settings.iter_mut() {
+      settings.pitch -= delta.y * settings.pitch_speed * time.delta_seconds();
+      settings.yaw += delta.x * settings.yaw_speed * time.delta_seconds();
+      
+      settings.pitch = settings.pitch.clamp(-89.9, 89.9);
+  
+      // info!("yaw {} {}", settings.yaw, settings.pitch);
+    }
   }
 
-  for (mut settings) in cam_settings.iter_mut() {
-    settings.pitch -= delta.y * settings.pitch_speed * time.delta_seconds();
-    settings.yaw += delta.x * settings.yaw_speed * time.delta_seconds();
-    
-    settings.pitch = settings.pitch.clamp(-89.9, 89.9);
 
-    info!("settings.yaw {:?}", settings.yaw);
-  }
 }
 
 
@@ -160,14 +205,17 @@ impl Default for PointerState {
 }
 
 
+#[derive(Component, Default)]
+pub struct Anchor(pub Vec3);
 
 
 
+fn rot_to_look_at(rot: Vec3) -> Vec3 {
+  let yaw = rot.y - std::f32::consts::PI * 0.5;
 
-
-
-
-
+  let len = rot.x.cos();
+  return Vec3::new(yaw.cos() * len, rot.x.sin(), -yaw.sin() * len).normalize();
+}
 
 
 
