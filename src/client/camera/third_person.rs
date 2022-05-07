@@ -7,14 +7,8 @@ use super::{Anchor, CameraSettings, PointerState};
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
-    // app
-    //   .add_system(rotate)
-    //   .add_system(movement);
     app
-      .add_system_to_stage(CoreStage::PostUpdate, rotate)
-      .add_system_to_stage(CoreStage::PostUpdate, movement)
-      .add_system(anchor_rotation)
-      ;
+      .add_system_to_stage(CoreStage::PostUpdate, rotate);
   }
 }
 
@@ -43,29 +37,5 @@ fn rotate(
     trans.translation = new.translation;
     trans.rotation = new.rotation;
     trans.scale = new.scale;
-  }
-}
-
-fn movement(
-  mut anchors: Query<(&Transform, &mut Anchor)>
-) {
-  for (trans, mut anchor) in anchors.iter_mut() {
-    anchor.pos = trans.translation.clone();
-  }
-}
-
-fn anchor_rotation(
-  mut anchors: Query<&mut Anchor>,
-  cam: Query<&CameraSettings>
-) {
-  for mut a in anchors.iter_mut() {
-    // target = a.0.clone();
-    for settings in cam.iter() {
-      let yaw_radians = settings.yaw.to_radians();
-      let pitch_radians = settings.pitch.to_radians();
-  
-      let cam_look_at = Math::rot_to_look_at(Vec3::new(pitch_radians, yaw_radians, 0.0));
-      a.dir = cam_look_at * -1.0;
-    }
   }
 }

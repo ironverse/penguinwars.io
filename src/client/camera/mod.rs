@@ -3,6 +3,8 @@ pub mod first_person;
 
 use bevy::{prelude::*, input::mouse::{MouseMotion, MouseButtonInput}};
 
+use crate::utils::Math;
+
 /*
   Third person camera
 */
@@ -17,7 +19,11 @@ impl Plugin for CustomPlugin {
       .add_startup_system(add_light);
 
     app
-      .add_system(mouse_motion);
+      .add_system(mouse_motion)
+      // .add_system(anchor_rotation)
+      .add_system_to_stage(CoreStage::PreUpdate, anchor_rotation)
+      .add_system_to_stage(CoreStage::PostUpdate, movement)
+      ;
 
     app
       .add_plugin(third_person::CustomPlugin)
@@ -93,6 +99,30 @@ fn mouse_motion(
   
       // info!("yaw {} {}", settings.yaw, settings.pitch);
     }
+  }
+}
+
+fn anchor_rotation(
+  mut anchors: Query<&mut Anchor>,
+  cam: Query<&CameraSettings>
+) {
+  for mut a in anchors.iter_mut() {
+    // target = a.0.clone();
+    for settings in cam.iter() {
+      let yaw_radians = settings.yaw.to_radians();
+      let pitch_radians = settings.pitch.to_radians();
+  
+      let cam_look_at = Math::rot_to_look_at(Vec3::new(pitch_radians, yaw_radians, 0.0));
+      a.dir = cam_look_at * -1.0;
+    }
+  }
+}
+
+fn movement(
+  mut anchors: Query<(&Transform, &mut Anchor)>
+) {
+  for (trans, mut anchor) in anchors.iter_mut() {
+    anchor.pos = trans.translation.clone();
   }
 }
 

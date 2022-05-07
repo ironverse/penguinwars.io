@@ -55,8 +55,6 @@ fn movement(
     right = forward.cross(Vec3::Y);
   }
 
-
-
   if key_input.pressed(KeyCode::W) {
     for (mut trans, char) in chars.iter_mut() {
       let dir = forward;
