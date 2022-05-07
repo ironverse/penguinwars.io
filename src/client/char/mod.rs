@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
-use crate::{client::camera::third_person::Anchor, utils::Math};
+use crate::{utils::Math};
+
+use super::camera::Anchor;
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
@@ -40,33 +42,45 @@ fn movement(
   key_input: Res<Input<KeyCode>>,
   time: Res<Time>,
 
+  anchors: Query<&Anchor>,
   mut chars: Query<(&mut Transform, &Character)>,
 ) {
+  let mut forward = Vec3::ZERO;
+  let mut right = Vec3::ZERO;
+  for a in anchors.iter() {
+    forward = a.dir.clone();
+    forward.y = 0.0; // Disable elevation for now
+    forward = forward.normalize();
+
+    right = forward.cross(Vec3::Y);
+  }
+
+
 
   if key_input.pressed(KeyCode::W) {
     for (mut trans, char) in chars.iter_mut() {
-      let dir = trans.forward().clone();
+      let dir = forward;
       trans.translation += dir * char.speed * time.delta_seconds();
     }
   }
 
   if key_input.pressed(KeyCode::S) {
     for (mut trans, char) in chars.iter_mut() {
-      let dir = trans.back().clone();
+      let dir = forward * -1.0;
       trans.translation += dir * char.speed * time.delta_seconds();
     }
   }
 
   if key_input.pressed(KeyCode::A) {
     for (mut trans, char) in chars.iter_mut() {
-      let dir = trans.left().clone();
+      let dir = right * -1.0;
       trans.translation += dir * char.speed * time.delta_seconds();
     }
   }
 
   if key_input.pressed(KeyCode::D) {
     for (mut trans, char) in chars.iter_mut() {
-      let dir = trans.right().clone();
+      let dir = right;
       trans.translation += dir * char.speed * time.delta_seconds();
     }
   }

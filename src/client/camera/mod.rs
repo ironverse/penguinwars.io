@@ -1,17 +1,139 @@
-use bevy::prelude::*;
+pub mod third_person;
+pub mod first_person;
+
+use bevy::{prelude::*, input::mouse::{MouseMotion, MouseButtonInput}};
 
 /*
   Third person camera
 */
 
-pub mod third_person;
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugin(third_person::CustomPlugin);
+      .insert_resource(PointerState::default())
+      .add_startup_system(add_cam)
+      .add_startup_system(add_light);
+
+    app
+      .add_system(mouse_motion);
+
+    app
+      .add_plugin(third_person::CustomPlugin)
+      // .add_plugin(first_person::CustomPlugin)
+      ;
+  }
+}
+
+/* Setup */
+fn add_cam(mut commands: Commands) {
+  commands
+    .spawn_bundle(PerspectiveCameraBundle {
+      transform: Transform::from_xyz(0.0, 0.5, -5.0).looking_at(Vec3::ZERO, Vec3::Y),
+      ..default()
+    })
+    .insert(CameraSettings::default());
+}
+
+fn add_light(mut commands: Commands) {
+  commands.spawn_bundle(PointLightBundle {
+    point_light: PointLight {
+      intensity: 1500.0,
+      shadows_enabled: true,
+      ..default()
+    },
+    transform: Transform::from_xyz(4.0, 8.0, 4.0),
+    ..default()
+  });
+}
+/* Setup */
+
+/* Setting Mouse settings, have to change name later */
+fn mouse_motion(
+  time: Res<Time>,
+  mut state: ResMut<PointerState>,
+  mut mouse_motion_events: EventReader<MouseMotion>,
+  mut ev_mousebtn: EventReader<MouseButtonInput>,
+  mut ev_cursor: EventReader<CursorMoved>,
+
+  mut cam_settings: Query<&mut CameraSettings>
+) {
+  let mut delta: Vec2 = Vec2::ZERO;
+  for event in mouse_motion_events.iter() {
+    delta += event.delta;
+  }
+
+  for ev_mouse in ev_mousebtn.iter() {
+    if ev_mouse.state.is_pressed() && ev_mouse.button == MouseButton::Left {
+      state.dragged = true;
+    }
+
+    if !ev_mouse.state.is_pressed() && ev_mouse.button == MouseButton::Left {
+      state.dragged = false;
+    }
+  }
+
+  for ev in ev_cursor.iter() {
+    if state.last_cursor_pos.length_squared() < 0.1 || !state.dragged {
+      state.last_cursor_pos = ev.position;
+      return;
+    }
+    delta = ev.position - state.last_cursor_pos;
+    // delta.y *= -1.0;
+    delta.x *= -1.0;
+    state.last_cursor_pos = ev.position;
+
+
+    for (mut settings) in cam_settings.iter_mut() {
+      settings.pitch -= delta.y * settings.pitch_speed * time.delta_seconds();
+      settings.yaw += delta.x * settings.yaw_speed * time.delta_seconds();
+      
+      settings.pitch = settings.pitch.clamp(-89.9, 89.9);
+  
+      // info!("yaw {} {}", settings.yaw, settings.pitch);
+    }
   }
 }
 
 
+
+#[derive(Component)]
+pub struct CameraSettings {
+  pub pitch: f32,
+  pub yaw: f32,
+  pub pitch_speed: f32,
+  pub yaw_speed: f32,
+}
+
+impl Default for CameraSettings {
+  fn default() -> Self {
+    Self {
+      pitch: 0.0,
+      yaw: 0.0,
+      pitch_speed: 10.0,
+      yaw_speed: 10.0
+    }
+  }
+}
+
+#[derive(Component)]
+struct PointerState {
+  dragged: bool,
+  last_cursor_pos: Vec2,
+}
+
+impl Default for PointerState {
+  fn default() -> Self {
+    Self {
+      dragged: false,
+      last_cursor_pos: Vec2::ZERO,
+    }
+  }
+}
+
+#[derive(Component, Default)]
+pub struct Anchor {
+  pub pos: Vec3,
+  pub dir: Vec3,
+}
