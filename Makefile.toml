@@ -1,5 +1,5 @@
 [tasks.web]
-dependencies = ["web-wasm-bindgen-cli", "compile", "client"]
+dependencies = ["clear", "web-wasm-bindgen-cli", "compile", "client"]
 
 [tasks.compile]
 script = '''
@@ -13,4 +13,10 @@ basic-http-server .
 '''
 
 [tasks.web-wasm-bindgen-cli]
-install_crate = {crate_name = "wasm-bindgen-cli", binary = "wasm-bindgen", test_arg="--help", version="0.2.80"}  
+install_crate = {crate_name = "wasm-bindgen-cli", binary = "wasm-bindgen", test_arg="--help", version="0.2.80"}
+
+
+[tasks.clear]
+script = '''
+clear
+'''

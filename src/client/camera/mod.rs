@@ -20,7 +20,6 @@ impl Plugin for CustomPlugin {
 
     app
       .add_system(mouse_motion)
-      // .add_system(anchor_rotation)
       .add_system_to_stage(CoreStage::PreUpdate, anchor_rotation)
       .add_system_to_stage(CoreStage::PostUpdate, movement)
       ;

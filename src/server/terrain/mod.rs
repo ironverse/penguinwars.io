@@ -1,8 +1,4 @@
-pub mod camera;
-pub mod char;
-pub mod terrain;
-pub mod utils;
-
+pub mod data;
 use bevy::prelude::*;
 use voxel::chunk::chunk_manager::ChunkManager;
 
@@ -13,11 +9,14 @@ impl Plugin for CustomPlugin {
       .insert_resource(GameResource::default());
 
     app
-      .add_plugin(camera::CustomPlugin)
-      .add_plugin(char::CustomPlugin)
-      .add_plugin(terrain::CustomPlugin);
+      .add_plugin(data::CustomPlugin);
+    /* 
+      Add code here to process data to collider
+      Then pass the data to renderer
+    */
   }
 }
+
 
 pub struct GameResource {
   pub chunk_manager: ChunkManager
@@ -30,3 +29,4 @@ impl Default for GameResource {
     }
   }
 }
+

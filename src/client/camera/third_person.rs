@@ -25,9 +25,6 @@ fn rotate(
     let yaw_radians = settings.yaw.to_radians();
     let pitch_radians = settings.pitch.to_radians();
 
-    // trans.rotation =
-    //   Quat::from_axis_angle(Vec3::Y, yaw_radians) * Quat::from_axis_angle(-Vec3::X, pitch_radians);
-
     let cam_look_at = Math::rot_to_look_at(Vec3::new(pitch_radians, yaw_radians, 0.0)) ;
     let cam_pos = target + (cam_look_at * 5.0);
     
