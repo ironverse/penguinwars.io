@@ -20,17 +20,23 @@ fn add_char(
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-  commands.spawn_bundle(PbrBundle {
-    mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
-    material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-    ..default()
-  });
+  // commands.spawn_bundle(PbrBundle {
+  //   mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
+  //   material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+  //   ..default()
+  // });
 
-  // cube
+  let depth = 1.0;
+  let radius = 0.5;
+  let total_height = (depth * 0.5) + radius;
   commands.spawn_bundle(PbrBundle {
-    mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+    mesh: meshes.add(Mesh::from(shape::Capsule {
+      depth: depth,
+      radius: radius,
+      ..Default::default()
+    })),
     material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-    transform: Transform::from_xyz(0.0, 0.5, 0.0),
+    transform: Transform::from_xyz(0.0, total_height, 0.0),
     ..default()
   })
   .insert(Character::default())

@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.7"
-voxel = { path = "../voxel" }
+voxels = { git = "https://github.com/ironverse/voxels.git", rev="8b800388" }

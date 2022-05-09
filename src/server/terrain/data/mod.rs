@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use voxel::chunk::adjacent_keys_by_dist;
+use voxels::chunk::adjacent_keys_by_dist;
 
 use super::GameResource;
 

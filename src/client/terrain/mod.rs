@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use voxel::{chunk::adjacent_keys_by_dist, data::voxel_octree::VoxelMode};
+use voxels::{chunk::adjacent_keys_by_dist, data::voxel_octree::VoxelMode};
 use super::{GameResource, utils::create_mesh};
 
 pub struct CustomPlugin;
@@ -24,10 +24,7 @@ fn entered_world_keys(
   let lod0 = res.chunk_manager.client_lod0;
   let keys0 = adjacent_keys_by_dist(&[0, 0, 0], lod0);
 
-  local_res.keys = keys0;
-  for key in local_res.keys.iter() {
-    // info!("key {:?}", key);
-  }
+  local_res.keys.extend(keys0.iter());
 }
 
 fn movement_delta_keys() {

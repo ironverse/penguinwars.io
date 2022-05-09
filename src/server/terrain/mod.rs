@@ -1,6 +1,6 @@
 pub mod data;
 use bevy::prelude::*;
-use voxel::chunk::chunk_manager::ChunkManager;
+use voxels::chunk::chunk_manager::ChunkManager;
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
