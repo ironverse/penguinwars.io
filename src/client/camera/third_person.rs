@@ -26,7 +26,7 @@ fn rotate(
     let pitch_radians = settings.pitch.to_radians();
 
     let cam_look_at = Math::rot_to_look_at(Vec3::new(pitch_radians, yaw_radians, 0.0)) ;
-    let cam_pos = target + (cam_look_at * 5.0);
+    let cam_pos = target + (cam_look_at * 10.0);
     
     let new = Transform::from_xyz(cam_pos[0], cam_pos[1], cam_pos[2])
       .looking_at(target, Vec3::Y);
