@@ -24,16 +24,6 @@ fn main() {
 
 /*
   TODO
-    Implement server side physics
-    Simplify the chunk data to be used on both server and client
-    Server should be the one sending data to the client
-    Server will receive data from the connector(Defer)
-
-
-    v1
-      We should separate the server from the client
-      Connect them via GlobalResource for now
-      All updates will be from server
-      Rendering all on client
-
+    Player movement using bevy_rapier3d
+    Terrain collider
 */

@@ -9,8 +9,7 @@ pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_startup_system(add_char)
-      .add_startup_system(add_collider);
+      .add_startup_system(add_char);
 
     app
       .add_system(movement2);
@@ -23,12 +22,6 @@ fn add_char(
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-  // commands.spawn_bundle(PbrBundle {
-  //   mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
-  //   material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-  //   ..default()
-  // });
-
   let ground_size = 5.0;
   let ground_height = 0.1;
 
@@ -60,17 +53,12 @@ fn add_char(
     .spawn()
     .insert(RigidBody::Dynamic)
     .insert(Collider::capsule_y(depth * 0.5, radius))
-    // .insert(Collider::cuboid(depth * 0.5, depth * 0.5, depth * 0.5))
     .insert(Transform::from_xyz(0.0, 10.0, 0.0))
     .insert(GlobalTransform::default())
-    // .spawn_bundle(PbrBundle {
-    //   mesh: meshes.add(Mesh::from(shape::Cube { size: 2.0 })),
-    //   material: materials.add(Color::rgb(0.0, 0.0, 0.0).into()),
-    //   transform: Transform::from_xyz(0.0, 0.0, 1.0),
-    //   ..default()
-    // })
-
     .insert(Character::default())
+    .insert(Anchor::default())
+    .insert(ExternalImpulse::default())
+    .insert(LockedAxes::ROTATION_LOCKED)
     .with_children(|parent| {
       parent.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Capsule {
@@ -80,38 +68,9 @@ fn add_char(
         })),
         material: handle,
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
-
-        // mesh: meshes.add(Mesh::from(shape::Cube { size: depth })),
-        // material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        // transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
       });
-      // .insert(Character::default())
-      // .insert(Anchor::default());
     });
-  
-  // commands.spawn_bundle(PbrBundle {
-  //   mesh: meshes.add(Mesh::from(shape::Capsule {
-  //     depth: depth,
-  //     radius: radius,
-  //     ..Default::default()
-  //   })),
-  //   material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-  //   transform: Transform::from_xyz(0.0, total_height, 0.0),
-  //   ..default()
-  // })
-  // .insert(Character::default())
-  // .insert(Anchor::default());
-
-
-  
-}
-
-fn add_collider(
-  mut commands: Commands
-) {
-  
-
 }
 
 fn movement2(
@@ -119,14 +78,46 @@ fn movement2(
   time: Res<Time>,
 
   anchors: Query<&Anchor>,
-  mut chars: Query<(&mut Transform, &Character)>,
+  mut chars: Query<(&mut Transform, &Character, &mut ExternalImpulse)>,
 ) {
+  let (forward, right) = get_directions(&anchors);
+  let mut direction = Vec3::ZERO;
+
+  if key_input.pressed(KeyCode::W) {
+    direction = forward;
+  }
+  if key_input.pressed(KeyCode::S) {
+    direction = forward * -1.0;
+  }
+  if key_input.pressed(KeyCode::A) {
+    direction = right * -1.0;
+  }
+  if key_input.pressed(KeyCode::D) {
+    direction = right;
+  }
+  if direction == Vec3::ZERO {
+    return;
+  }
+
+  let force = 50.0;
+  let mut inter_force = direction * force * time.delta_seconds();
+  for (mut trans, char, mut ext_impulse) in chars.iter_mut() {
+    ext_impulse.impulse = inter_force;
+    ext_impulse.torque_impulse = Vec3::ZERO;
+  }
+}
+
+fn get_directions(anchors: &Query<&Anchor>) -> (Vec3, Vec3) {
   let mut forward = Vec3::ZERO;
   let mut right = Vec3::ZERO;
-  for (mut trans, char) in chars.iter_mut() {
-    // info!("trans {:?}", trans);
-    // trans.rotation *= Quat::from_rotation_x(3.0 * time.delta_seconds());
+  for a in anchors.iter() {
+    forward = a.dir.clone();
+    forward.y = 0.0; // Disable elevation for now
+    forward = forward.normalize();
+
+    right = forward.cross(Vec3::Y);
   }
+  (forward, right)
 }
 
 
@@ -188,3 +179,6 @@ impl Default for Character {
     }
   }
 }
+
+
+
