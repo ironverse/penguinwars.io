@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use voxels::chunk::world_pos_to_key;
-use crate::{utils::Math};
+use voxels::chunk::{world_pos_to_key, voxel_pos_to_key};
+use crate::{utils::{Math, to_key}};
 use super::{camera::Anchor, GameResource};
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
-    // .add_startup_system(add_ground)
+      // .add_startup_system(add_ground)
       .add_startup_system(add_char);
 
     app
@@ -22,17 +22,17 @@ fn add_ground(
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-  let ground_size = 5.0;
+  let ground_size = 1.0;
   let ground_height = 0.1;
 
   commands
     .spawn()
-    .insert(Collider::cuboid(ground_size, ground_height, ground_size))
+    .insert(Collider::cuboid(ground_size * 0.5, ground_height, ground_size * 0.5))
     .insert(Transform::from_xyz(0.0, -ground_height, 0.0))
     .insert(GlobalTransform::default());
   
   commands.spawn_bundle(PbrBundle {
-    mesh: meshes.add(Mesh::from(shape::Plane { size: ground_size * 2.0 })),
+    mesh: meshes.add(Mesh::from(shape::Plane { size: ground_size * 1.0 })),
     material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
     ..default()
   });
@@ -59,12 +59,13 @@ fn add_char(
   let pos = Vec3::new(0.0, 5.0, 0.0);
   let seamless_size = res.chunk_manager.seamless_size();
   let char = Character {
-    key: world_pos_to_key(&[pos.x as i64, pos.y as i64, pos.y as i64], seamless_size),
+    // cur_key: world_pos_to_key(&[pos.x as i64, pos.y as i64, pos.y as i64], seamless_size),
+    cur_key: voxel_pos_to_key(&[pos.x as i64, pos.y as i64, pos.y as i64], seamless_size),
     ..default()
   };
   commands
     .spawn()
-    // .insert(RigidBody::Dynamic)
+    .insert(RigidBody::Dynamic)
     .insert(Collider::capsule_y(depth * 0.5, radius))
     .insert(Transform::from_translation(pos))
     .insert(GlobalTransform::default())
@@ -109,27 +110,23 @@ fn movement(
   if key_input.pressed(KeyCode::D) {
     direction = right;
   }
-  if direction == Vec3::ZERO {
-    return;
-  }
+  
 
   let force = 50.0;
   let mut inter_force = direction * force * time.delta_seconds();
   for (mut trans, mut char, mut ext_impulse) in chars.iter_mut() {
+    let key = to_key(&trans.translation, res.chunk_manager.seamless_size());
+    if char.cur_key != key {
+      char.prev_key = char.cur_key.clone();
+      char.cur_key = key;
+    }
+
+    if direction == Vec3::ZERO {
+      return;
+    }
+
     ext_impulse.impulse = inter_force;
     ext_impulse.torque_impulse = Vec3::ZERO;
-
-    let seamless_size = res.chunk_manager.seamless_size();
-    let pos = &[
-      trans.translation.x as i64, 
-      trans.translation.y as i64, 
-      trans.translation.z as i64
-    ];
-
-    let key = world_pos_to_key(pos, seamless_size);
-    if char.key != key {
-      char.key = key;
-    }
   }
 }
 
@@ -150,14 +147,16 @@ fn get_directions(anchors: &Query<&Anchor>) -> (Vec3, Vec3) {
 #[derive(Component)]
 pub struct Character {
   pub speed: f32,
-  pub key: [i64; 3],
+  pub prev_key: [i64; 3],
+  pub cur_key: [i64; 3],
 }
 
 impl Default for Character {
   fn default() -> Self {
     Self {
       speed: 5.0,
-      key: [0, 0, 0],
+      prev_key: [i64::MIN, i64::MIN, i64::MIN],
+      cur_key: [i64::MIN, i64::MIN, i64::MIN],
     }
   }
 }

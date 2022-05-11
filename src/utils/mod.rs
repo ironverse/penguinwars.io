@@ -1,5 +1,5 @@
 use bevy::math::{Vec3, Quat};
-
+use voxels::chunk::{world_pos_to_key, world_pos_to_key2, voxel_pos_to_key};
 
 pub struct Math;
 
@@ -37,4 +37,13 @@ impl Math {
     let len = rot.x.cos();
     return Vec3::new(yaw.cos() * len, rot.x.sin(), -yaw.sin() * len).normalize();
   }
+}
+
+
+
+
+
+pub fn to_key(translation: &Vec3, seamless_size: u32) -> [i64; 3] {
+  let pos = [translation.x as i64, translation.y as i64, translation.z as i64];
+  voxel_pos_to_key(&pos, seamless_size)
 }

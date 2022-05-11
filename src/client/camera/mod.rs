@@ -42,13 +42,37 @@ fn add_cam(mut commands: Commands) {
 }
 
 fn add_light(mut commands: Commands) {
-  commands.spawn_bundle(PointLightBundle {
-    point_light: PointLight {
-      intensity: 1500.0,
+  // commands.spawn_bundle(PointLightBundle {
+  //   point_light: PointLight {
+  //     intensity: 1500.0,
+  //     shadows_enabled: true,
+  //     ..default()
+  //   },
+  //   transform: Transform::from_xyz(4.0, 8.0, 4.0),
+  //   ..default()
+  // });
+
+  const HALF_SIZE: f32 = 10.0;
+  commands.spawn_bundle(DirectionalLightBundle {
+    directional_light: DirectionalLight {
+      shadow_projection: OrthographicProjection {
+        left: -HALF_SIZE,
+        right: HALF_SIZE,
+        bottom: -HALF_SIZE,
+        top: HALF_SIZE,
+        near: -10.0 * HALF_SIZE,
+        far: 10.0 * HALF_SIZE,
+        ..default()
+      },
       shadows_enabled: true,
+      illuminance: 10.0,
       ..default()
     },
-    transform: Transform::from_xyz(4.0, 8.0, 4.0),
+    transform: Transform {
+      translation: Vec3::new(0.0, 10.0, 0.0),
+      rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
+      ..default()
+    },
     ..default()
   });
 }
@@ -139,7 +163,7 @@ impl Default for CameraSettings {
   fn default() -> Self {
     Self {
       pitch: 0.0,
-      yaw: 0.0,
+      yaw: 180.0,
       pitch_speed: 10.0,
       yaw_speed: 10.0
     }
