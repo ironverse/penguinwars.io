@@ -1,10 +1,10 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::Instant};
 use bevy_rapier3d::{rapier::{prelude::{ColliderFlags, ColliderShape, ColliderPosition, ActiveCollisionTypes}, math::Point}, prelude::Collider};
 use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range}, data::{voxel_octree::{VoxelMode, VoxelOctree}, surface_nets::{get_surface_nets2}}};
-
 use crate::utils::to_key;
-
 use super::{GameResource, utils::create_mesh, char::Character};
+
+const LOWEST_TIME_DELTA_LIMIT: f32 = 1.0 / 30.0;
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
@@ -66,9 +66,15 @@ fn movement_delta_keys(
 fn load_data(
   mut local_res: ResMut<LocalResource>,
   mut res: ResMut<GameResource>,
+  time: Res<Time>,
 ) {
   /* TODO: Limit loading data based on time spent, to not lock the whole system */
-  let lod = res.chunk_manager.depth;
+  
+  if time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
+    return;
+  }
+
+  let mut current_time = 0.0;
   for index in (0..local_res.load_keys.len()) {
     let key = &local_res.load_keys.pop().unwrap();
 
@@ -77,8 +83,18 @@ fn load_data(
       // continue;
     }
 
+    let start = Instant::now();
+
+    let lod = res.chunk_manager.depth;
     let chunk = res.chunk_manager.new_chunk3(key, lod as u8);
     local_res.chunks.push(chunk);
+
+    let duration = start.elapsed();
+    current_time += duration.as_secs_f32();
+
+    if current_time >= LOWEST_TIME_DELTA_LIMIT {
+      return;
+    }
   }
 }
 
@@ -90,8 +106,14 @@ fn add_meshes(
 
   mut local_res: ResMut<LocalResource>,
   mut res: ResMut<GameResource>,
+  time: Res<Time>,
 ) {
-  let lod = res.chunk_manager.depth;
+  if time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
+    return;
+  }
+
+  let mut current_time = 0.0;
+
   let mut test_index = 0;
   for index in (0..local_res.load_mesh_keys.len()).rev() {
     let key = &local_res.load_mesh_keys[index].clone();
@@ -109,6 +131,8 @@ fn add_meshes(
     // if *key != [0, -1, 2] {
     //   continue;
     // }
+
+    let start = Instant::now();
     
     let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
     if d.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
@@ -129,6 +153,14 @@ fn add_meshes(
       });
 
     test_index += 1;
+
+
+    let duration = start.elapsed();
+    current_time += duration.as_secs_f32();
+
+    if current_time >= LOWEST_TIME_DELTA_LIMIT {
+      return;
+    }
   }
 }
 
@@ -139,7 +171,15 @@ fn add_colliders(
 
   mut local_res: ResMut<LocalResource>,
   mut res: ResMut<GameResource>,
+
+  time: Res<Time>,
 ) {
+  if time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
+    return;
+  }
+
+  let mut current_time = 0.0;
+
   let keys = local_res.load_collider_keys.clone();
   for index in (0..keys.len()).rev() {
     let key = &keys[index];    
@@ -153,6 +193,8 @@ fn add_colliders(
     if !is_valid_chunk(&chunk) {
       continue;
     }
+
+    let start = Instant::now();
 
     let data = create_collider_mesh(&chunk.octree);
     if data.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
@@ -169,6 +211,13 @@ fn add_colliders(
       .insert(GlobalTransform::default());
 
     // info!("collider created key {:?}", key);
+
+    let duration = start.elapsed();
+    current_time += duration.as_secs_f32();
+
+    if current_time >= LOWEST_TIME_DELTA_LIMIT {
+      return;
+    }
   }
 }
 
