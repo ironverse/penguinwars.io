@@ -1,23 +1,23 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-
+use voxels::chunk::world_pos_to_key;
 use crate::{utils::Math};
-
-use super::camera::Anchor;
+use super::{camera::Anchor, GameResource};
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
+    // .add_startup_system(add_ground)
       .add_startup_system(add_char);
 
     app
-      .add_system(movement2);
-      // .add_system(movement);
+      .add_system(movement);
+      
   }
 }
 
-fn add_char(
+fn add_ground(
   mut commands: Commands,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<StandardMaterial>>,
@@ -36,8 +36,14 @@ fn add_char(
     material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
     ..default()
   });
+}
 
-
+fn add_char(
+  mut commands: Commands,
+  mut meshes: ResMut<Assets<Mesh>>,
+  mut materials: ResMut<Assets<StandardMaterial>>,
+  res: Res<GameResource>,
+) {
   let depth = 1.0;
   let radius = 0.5;
   let total_height = (depth * 0.5) + radius;
@@ -49,13 +55,20 @@ fn add_char(
       ..default()
     }
   );
+
+  let pos = Vec3::new(0.0, 5.0, 0.0);
+  let seamless_size = res.chunk_manager.seamless_size();
+  let char = Character {
+    key: world_pos_to_key(&[pos.x as i64, pos.y as i64, pos.y as i64], seamless_size),
+    ..default()
+  };
   commands
     .spawn()
-    .insert(RigidBody::Dynamic)
+    // .insert(RigidBody::Dynamic)
     .insert(Collider::capsule_y(depth * 0.5, radius))
-    .insert(Transform::from_xyz(0.0, 10.0, 0.0))
+    .insert(Transform::from_translation(pos))
     .insert(GlobalTransform::default())
-    .insert(Character::default())
+    .insert(char)
     .insert(Anchor::default())
     .insert(ExternalImpulse::default())
     .insert(LockedAxes::ROTATION_LOCKED)
@@ -73,12 +86,13 @@ fn add_char(
     });
 }
 
-fn movement2(
+fn movement(
   key_input: Res<Input<KeyCode>>,
   time: Res<Time>,
+  res: Res<GameResource>,
 
   anchors: Query<&Anchor>,
-  mut chars: Query<(&mut Transform, &Character, &mut ExternalImpulse)>,
+  mut chars: Query<(&mut Transform, &mut Character, &mut ExternalImpulse)>,
 ) {
   let (forward, right) = get_directions(&anchors);
   let mut direction = Vec3::ZERO;
@@ -101,9 +115,21 @@ fn movement2(
 
   let force = 50.0;
   let mut inter_force = direction * force * time.delta_seconds();
-  for (mut trans, char, mut ext_impulse) in chars.iter_mut() {
+  for (mut trans, mut char, mut ext_impulse) in chars.iter_mut() {
     ext_impulse.impulse = inter_force;
     ext_impulse.torque_impulse = Vec3::ZERO;
+
+    let seamless_size = res.chunk_manager.seamless_size();
+    let pos = &[
+      trans.translation.x as i64, 
+      trans.translation.y as i64, 
+      trans.translation.z as i64
+    ];
+
+    let key = world_pos_to_key(pos, seamless_size);
+    if char.key != key {
+      char.key = key;
+    }
   }
 }
 
@@ -121,61 +147,17 @@ fn get_directions(anchors: &Query<&Anchor>) -> (Vec3, Vec3) {
 }
 
 
-fn movement(
-  key_input: Res<Input<KeyCode>>,
-  time: Res<Time>,
-
-  anchors: Query<&Anchor>,
-  mut chars: Query<(&mut Transform, &Character)>,
-) {
-  let mut forward = Vec3::ZERO;
-  let mut right = Vec3::ZERO;
-  for a in anchors.iter() {
-    forward = a.dir.clone();
-    forward.y = 0.0; // Disable elevation for now
-    forward = forward.normalize();
-
-    right = forward.cross(Vec3::Y);
-  }
-
-  if key_input.pressed(KeyCode::W) {
-    for (mut trans, char) in chars.iter_mut() {
-      let dir = forward;
-      trans.translation += dir * char.speed * time.delta_seconds();
-    }
-  }
-
-  if key_input.pressed(KeyCode::S) {
-    for (mut trans, char) in chars.iter_mut() {
-      let dir = forward * -1.0;
-      trans.translation += dir * char.speed * time.delta_seconds();
-    }
-  }
-
-  if key_input.pressed(KeyCode::A) {
-    for (mut trans, char) in chars.iter_mut() {
-      let dir = right * -1.0;
-      trans.translation += dir * char.speed * time.delta_seconds();
-    }
-  }
-
-  if key_input.pressed(KeyCode::D) {
-    for (mut trans, char) in chars.iter_mut() {
-      let dir = right;
-      trans.translation += dir * char.speed * time.delta_seconds();
-    }
-  }
-}
-
 #[derive(Component)]
 pub struct Character {
   pub speed: f32,
+  pub key: [i64; 3],
 }
 
 impl Default for Character {
   fn default() -> Self {
     Self {
-      speed: 5.0
+      speed: 5.0,
+      key: [0, 0, 0],
     }
   }
 }

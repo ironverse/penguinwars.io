@@ -26,4 +26,5 @@ fn main() {
   TODO
     Player movement using bevy_rapier3d
     Terrain collider
+    Create terrain collider based on character's position
 */
