@@ -112,7 +112,7 @@ fn movement(
   }
   
 
-  let force = 50.0;
+  let force = 20.0;
   let mut inter_force = direction * force * time.delta_seconds();
   for (mut trans, mut char, mut ext_impulse) in chars.iter_mut() {
     let key = to_key(&trans.translation, res.chunk_manager.seamless_size());

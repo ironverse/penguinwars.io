@@ -4,7 +4,7 @@ use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, a
 use crate::utils::to_key;
 use super::{GameResource, utils::create_mesh, char::Character};
 
-const LOWEST_TIME_DELTA_LIMIT: f32 = 1.0 / 30.0;
+const LOWEST_TIME_DELTA_LIMIT: f32 = 1.0 / 55.0;
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
@@ -12,13 +12,18 @@ impl Plugin for CustomPlugin {
     app
       .insert_resource(LocalResource::default());
     app
+      .add_system_to_stage(CoreStage::First, reset_time)
       .add_system(entered_world_keys)
       .add_system(movement_delta_keys)
-      .add_system(load_data)
-      .add_system(add_meshes)
-      .add_system(add_colliders)
+      .add_system(load_data.label("load_data"))
+      .add_system(add_meshes.after("load_data"))
+      .add_system(add_colliders.after("load_data"))
       .add_system(remove_colliders);
   }
+}
+
+fn reset_time(mut local_res: ResMut<LocalResource>) {
+  local_res.delta_time = 0.0;
 }
 
 fn entered_world_keys(
@@ -69,8 +74,9 @@ fn load_data(
   time: Res<Time>,
 ) {
   /* TODO: Limit loading data based on time spent, to not lock the whole system */
-  
-  if time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
+  // info!("load_data");
+  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
+  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
     return;
   }
 
@@ -90,9 +96,9 @@ fn load_data(
     local_res.chunks.push(chunk);
 
     let duration = start.elapsed();
-    current_time += duration.as_secs_f32();
+    local_res.delta_time += duration.as_secs_f32();
 
-    if current_time >= LOWEST_TIME_DELTA_LIMIT {
+    if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
       return;
     }
   }
@@ -108,13 +114,15 @@ fn add_meshes(
   mut res: ResMut<GameResource>,
   time: Res<Time>,
 ) {
-  if time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
+  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
+  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
     return;
   }
 
   let mut current_time = 0.0;
 
-  let mut test_index = 0;
+  let mut mesh_count = 0;
+  let allowed_mesh_to_process = 2;
   for index in (0..local_res.load_mesh_keys.len()).rev() {
     let key = &local_res.load_mesh_keys[index].clone();
     let chunk_op = get_chunk(key, &local_res.chunks);
@@ -131,14 +139,12 @@ fn add_meshes(
     // if *key != [0, -1, 2] {
     //   continue;
     // }
-
-    let start = Instant::now();
     
     let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
     if d.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
       continue;
     }
-    // info!("d.indices.len() {}", d.indices.len());
+    // // info!("d.indices.len() {}", d.indices.len());
     let mesh = create_mesh(&mut meshes, d.positions, d.normals, d.uvs, d.indices);
 
     let seamless_size = res.chunk_manager.seamless_size();
@@ -152,13 +158,8 @@ fn add_meshes(
         ..Default::default()
       });
 
-    test_index += 1;
-
-
-    let duration = start.elapsed();
-    current_time += duration.as_secs_f32();
-
-    if current_time >= LOWEST_TIME_DELTA_LIMIT {
+    mesh_count += 1;
+    if mesh_count >= allowed_mesh_to_process {
       return;
     }
   }
@@ -174,7 +175,8 @@ fn add_colliders(
 
   time: Res<Time>,
 ) {
-  if time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
+  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
+  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
     return;
   }
 
@@ -210,12 +212,10 @@ fn add_colliders(
       .insert(Transform::from_xyz(pos_f32[0], pos_f32[1], pos_f32[2]) )
       .insert(GlobalTransform::default());
 
-    // info!("collider created key {:?}", key);
-
     let duration = start.elapsed();
-    current_time += duration.as_secs_f32();
+    local_res.delta_time += duration.as_secs_f32();
 
-    if current_time >= LOWEST_TIME_DELTA_LIMIT {
+    if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
       return;
     }
   }
@@ -304,7 +304,8 @@ struct LocalResource {
   load_keys: Vec<[i64; 3]>,
   load_mesh_keys: Vec<[i64; 3]>,
   load_collider_keys: Vec<[i64; 3]>,
-  chunks: Vec<Chunk>
+  chunks: Vec<Chunk>,
+  delta_time: f32,
 }
 
 impl Default for LocalResource {
@@ -315,6 +316,7 @@ impl Default for LocalResource {
       load_mesh_keys: Vec::new(),
       load_collider_keys: Vec::new(),
       chunks: Vec::new(),
+      delta_time: 0.0,
     }
   }
 }

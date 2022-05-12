@@ -2,6 +2,7 @@ pub mod camera;
 pub mod char;
 pub mod terrain;
 pub mod utils;
+pub mod debugger;
 
 use bevy::prelude::*;
 use voxels::chunk::chunk_manager::ChunkManager;
@@ -15,7 +16,8 @@ impl Plugin for CustomPlugin {
     app
       .add_plugin(camera::CustomPlugin)
       .add_plugin(char::CustomPlugin)
-      .add_plugin(terrain::CustomPlugin);
+      .add_plugin(terrain::CustomPlugin)
+      .add_plugin(debugger::CustomPlugin);
   }
 }
 
