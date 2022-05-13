@@ -252,13 +252,29 @@ fn remove_meshes(
   chars: Query<(&Character)>,
   terrain_query: Query<(Entity, &Transform, &TerrainChunk)>
 ) {
-  for (lod, char) in chars.iter().enumerate() {
+  for char in chars.iter() {
     for (entity, transform, terrain_chunk) in terrain_query.iter() {
       let key = to_key(&transform.translation, res.chunk_manager.seamless_size());
-    
-      if terrain_chunk.lod == lod as u8 && !in_range(&char.cur_key, &key, res.chunk_manager.lod_dist[lod]) {
-        commands.entity(entity).despawn_recursive();
+      
+      for (index, dist) in res.chunk_manager.lod_dist.iter().enumerate() {
+
+        let min = if index == 0 { 0 } else { res.chunk_manager.lod_dist[index - 1] };
+        let max = dist;
+
+        if terrain_chunk.lod == index as u8 && 
+        !in_range(&char.cur_key, &key, *max) {
+          commands.entity(entity).despawn_recursive();
+        }
+
+
+        if index != 0 {
+          if terrain_chunk.lod == index as u8 && in_range(&char.cur_key, &key, min) {
+            commands.entity(entity).despawn_recursive();
+          }
+        }
+        
       }
+      
     }
   }
   
