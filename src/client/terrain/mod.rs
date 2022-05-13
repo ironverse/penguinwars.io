@@ -18,7 +18,8 @@ impl Plugin for CustomPlugin {
       .add_system(load_data.label("load_data"))
       .add_system(add_meshes.after("load_data"))
       .add_system(add_colliders.after("load_data"))
-      .add_system(remove_colliders);
+      .add_system(remove_colliders)
+      .add_system(remove_meshes);
   }
 }
 
@@ -150,12 +151,16 @@ fn add_meshes(
     let seamless_size = res.chunk_manager.seamless_size();
     let coord_f32 = key_to_world_coord_f32(key, seamless_size);
 
+    let lod = res.chunk_manager.lod_dist0 as u8;
     commands
       .spawn_bundle(PbrBundle {
         mesh: mesh,
         material: materials.add(Color::rgba(0.5, 0.4, 0.3, 0.3).into()),
         transform: Transform::from_xyz(coord_f32[0], coord_f32[1], coord_f32[2]),
         ..Default::default()
+      })
+      .insert(TerrainChunk {
+        lod: lod
       });
 
     mesh_count += 1;
@@ -244,7 +249,24 @@ fn remove_colliders(
   }
 }
 
+fn remove_meshes(
+  mut commands: Commands,
+  res: Res<GameResource>,
 
+  chars: Query<(&Character)>,
+  terrain_query: Query<(Entity, &Transform), With<TerrainChunk>>
+) {
+  for char in chars.iter() {
+    for (entity, transform) in terrain_query.iter() {
+      let key = to_key(&transform.translation, res.chunk_manager.seamless_size());
+    
+      if !in_range(&char.cur_key, &key, res.chunk_manager.lod_dist0) {
+        commands.entity(entity).despawn_recursive();
+      }
+    }
+  }
+  
+}
 
 
 
@@ -329,6 +351,9 @@ pub struct MeshColliderData {
   pub indices: Vec<[u32; 3]>,
 }
 
-
+#[derive(Component)]
+pub struct TerrainChunk {
+  pub lod: u8
+}
 
 
