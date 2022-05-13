@@ -1,6 +1,6 @@
 use bevy::{prelude::*, utils::Instant};
 use bevy_rapier3d::{rapier::{prelude::{ColliderFlags, ColliderShape, ColliderPosition, ActiveCollisionTypes}, math::Point}, prelude::Collider};
-use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range}, data::{voxel_octree::{VoxelMode, VoxelOctree}, surface_nets::{get_surface_nets2}}};
+use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range, adjacent_keys_minmax, delta_keys_minmax}, data::{voxel_octree::{VoxelMode, VoxelOctree}, surface_nets::{get_surface_nets2}}};
 use crate::utils::to_key;
 use super::{GameResource, utils::create_mesh, char::Character};
 
@@ -18,8 +18,9 @@ impl Plugin for CustomPlugin {
       .add_system(load_data.label("load_data"))
       .add_system(add_meshes.after("load_data"))
       .add_system(add_colliders.after("load_data"))
+      .add_system(remove_meshes)
       .add_system(remove_colliders)
-      .add_system(remove_meshes);
+      ;
   }
 }
 
@@ -34,13 +35,16 @@ fn entered_world_keys(
   chars: Query<&Character, Added<Character>>,
 ) {
   for char in chars.iter() {
-    let dist0 = res.chunk_manager.lod_dist0;
-    let keys0 = adjacent_keys_by_dist(&char.cur_key, dist0);
+    for (index, dist) in res.chunk_manager.lod_dist.iter().enumerate() {
+      let min = if index == 0 { 0 } else { res.chunk_manager.lod_dist[index - 1] };
+      let max = res.chunk_manager.lod_dist[index];
+      let keys = adjacent_keys_minmax(&char.cur_key, min, max);
+      local_res.load_keys.push(keys.clone());
+      local_res.load_mesh_keys.push(keys.clone());
 
-    local_res.load_keys.extend(keys0.iter());
-    local_res.load_mesh_keys.extend(keys0.iter());
+      local_res.chunks.push(Vec::new());
+    }
 
-    // let col_keys = adjacent_keys_by_dist(&char.key, 1);
     let col_keys = adjacent_keys(&char.cur_key, 1);
     local_res.load_collider_keys.extend(col_keys.iter());
   }
@@ -57,11 +61,21 @@ fn movement_delta_keys(
       continue;
     }
 
-    let range = res.chunk_manager.lod_dist0;
-    let keys0 = delta_keys(&char.prev_key, &char.cur_key, range);
+    for (index, dist) in res.chunk_manager.lod_dist.iter().enumerate() {
+      let min = if index == 0 { 0 } else { res.chunk_manager.lod_dist[index - 1] };
+      let max = res.chunk_manager.lod_dist[index];
+      let keys = delta_keys_minmax(&char.prev_key, &char.cur_key, min, max);
+      local_res.load_keys[index].extend(keys.clone());
+      local_res.load_mesh_keys[index].extend(keys.clone());
 
-    local_res.load_keys.extend(keys0.iter());
-    local_res.load_mesh_keys.extend(keys0.iter());
+      local_res.chunks.push(Vec::new());
+    }
+
+    // let range = res.chunk_manager.lod_dist0;
+    // let keys0 = delta_keys(&char.prev_key, &char.cur_key, range);
+
+    // local_res.load_keys.extend(keys0.iter());
+    // local_res.load_mesh_keys.extend(keys0.iter());
 
     let col_keys = adj_delta_keys(&char.prev_key, &char.cur_key, 1);
     local_res.load_collider_keys.extend(col_keys.iter());
@@ -74,34 +88,29 @@ fn load_data(
   mut res: ResMut<GameResource>,
   time: Res<Time>,
 ) {
-  /* TODO: Limit loading data based on time spent, to not lock the whole system */
-  // info!("load_data");
   if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
   || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
     return;
   }
+  
+  for lod_index in (0..local_res.load_keys.len()) {
+    for index in (0..local_res.load_keys[lod_index].len()).rev() {
+      let key = &local_res.load_keys[lod_index].swap_remove(index);
 
-  let mut current_time = 0.0;
-  for index in (0..local_res.load_keys.len()) {
-    let key = &local_res.load_keys.pop().unwrap();
+      let start = Instant::now();
 
-    // if *key != [0, -1, 2] {
-    if *key != [0, -1, 0] && *key != [-1, -1, 0] {
-      // continue;
-    }
+      let lod = res.chunk_manager.depth - lod_index as u32;
+      let chunk = res.chunk_manager.new_chunk3(key, lod as u8);
+      local_res.chunks[lod_index].push(chunk);
 
-    let start = Instant::now();
+      let duration = start.elapsed();
+      local_res.delta_time += duration.as_secs_f32();
 
-    let lod = res.chunk_manager.depth;
-    let chunk = res.chunk_manager.new_chunk3(key, lod as u8);
-    local_res.chunks.push(chunk);
-
-    let duration = start.elapsed();
-    local_res.delta_time += duration.as_secs_f32();
-
-    if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
-      return;
-    }
+      if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
+        return;
+      }
+      // info!("load_data {}", time.delta_seconds());
+    } 
   }
 }
 
@@ -115,59 +124,61 @@ fn add_meshes(
   mut res: ResMut<GameResource>,
   time: Res<Time>,
 ) {
+
   if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
   || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
     return;
   }
 
-  let mut current_time = 0.0;
+  for lod_index in (0..local_res.load_mesh_keys.len()) {
+    for index in (0..local_res.load_mesh_keys[lod_index].len()).rev() {
+      let start = Instant::now();
 
-  let mut mesh_count = 0;
-  let allowed_mesh_to_process = 2;
-  for index in (0..local_res.load_mesh_keys.len()).rev() {
-    let key = &local_res.load_mesh_keys[index].clone();
-    let chunk_op = get_chunk(key, &local_res.chunks);
-    if chunk_op.is_none() {
-      continue;
-    }
-    local_res.load_mesh_keys.swap_remove(index);
-
-    let chunk = chunk_op.unwrap();
-    if !is_valid_chunk(&chunk) {
-      // continue;
-    }
-
-    // if *key != [0, -1, 2] {
-    //   continue;
-    // }
+      // info!("index {}", index);
+      let key = &local_res.load_mesh_keys[lod_index][index].clone();
+      let chunk_op = get_chunk(key, &local_res.chunks[lod_index]);
+      if chunk_op.is_none() {
+        continue;
+      }
+      local_res.load_mesh_keys[lod_index].swap_remove(index);
+  
+      let chunk = chunk_op.unwrap();
+      // if !is_valid_chunk(&chunk) {
+      //   // continue;
+      // }
+      
+      let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
+      if d.indices.len() != 0 { // Temporary, should be removed once the ChunkMode detection is working
+        // info!("d.indices.len() {}", d.indices.len());
+        let mesh = create_mesh(&mut meshes, d.positions, d.normals, d.uvs, d.indices);
     
-    let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
-    if d.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
-      continue;
-    }
-    // // info!("d.indices.len() {}", d.indices.len());
-    let mesh = create_mesh(&mut meshes, d.positions, d.normals, d.uvs, d.indices);
+        let seamless_size = res.chunk_manager.seamless_size();
+        let coord_f32 = key_to_world_coord_f32(key, seamless_size);
+    
+        let lod = lod_index as u8;
+        commands
+          .spawn_bundle(PbrBundle {
+            mesh: mesh,
+            material: materials.add(Color::rgba(0.5, 0.4, 0.3, 0.3).into()),
+            transform: Transform::from_xyz(coord_f32[0], coord_f32[1], coord_f32[2]),
+            ..Default::default()
+          })
+          .insert(TerrainChunk {
+            lod: lod
+          });
+      }
 
-    let seamless_size = res.chunk_manager.seamless_size();
-    let coord_f32 = key_to_world_coord_f32(key, seamless_size);
+      let duration = start.elapsed();
+      local_res.delta_time += duration.as_secs_f32();
 
-    let lod = res.chunk_manager.lod_dist0 as u8;
-    commands
-      .spawn_bundle(PbrBundle {
-        mesh: mesh,
-        material: materials.add(Color::rgba(0.5, 0.4, 0.3, 0.3).into()),
-        transform: Transform::from_xyz(coord_f32[0], coord_f32[1], coord_f32[2]),
-        ..Default::default()
-      })
-      .insert(TerrainChunk {
-        lod: lod
-      });
-
-    mesh_count += 1;
-    if mesh_count >= allowed_mesh_to_process {
-      return;
+      if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
+        return;
+      }
+      
     }
   }
+
+  
 }
 
 fn add_colliders(
@@ -185,12 +196,10 @@ fn add_colliders(
     return;
   }
 
-  let mut current_time = 0.0;
-
   let keys = local_res.load_collider_keys.clone();
   for index in (0..keys.len()).rev() {
     let key = &keys[index];    
-    let chunk_op = get_chunk(key, &local_res.chunks);
+    let chunk_op = get_chunk(key, &local_res.chunks[0]);
     if chunk_op.is_none() {
       continue;
     }
@@ -224,6 +233,7 @@ fn add_colliders(
       return;
     }
   }
+  
 }
 
 fn remove_colliders(
@@ -254,13 +264,13 @@ fn remove_meshes(
   res: Res<GameResource>,
 
   chars: Query<(&Character)>,
-  terrain_query: Query<(Entity, &Transform), With<TerrainChunk>>
+  terrain_query: Query<(Entity, &Transform, &TerrainChunk)>
 ) {
-  for char in chars.iter() {
-    for (entity, transform) in terrain_query.iter() {
+  for (lod, char) in chars.iter().enumerate() {
+    for (entity, transform, terrain_chunk) in terrain_query.iter() {
       let key = to_key(&transform.translation, res.chunk_manager.seamless_size());
     
-      if !in_range(&char.cur_key, &key, res.chunk_manager.lod_dist0) {
+      if terrain_chunk.lod == lod as u8 && !in_range(&char.cur_key, &key, res.chunk_manager.lod_dist[lod]) {
         commands.entity(entity).despawn_recursive();
       }
     }
@@ -323,10 +333,10 @@ fn is_valid_chunk(chunk: &Chunk) -> bool {
 
 struct LocalResource {
   first_time_load: bool,
-  load_keys: Vec<[i64; 3]>,
-  load_mesh_keys: Vec<[i64; 3]>,
+  load_keys: Vec<Vec<[i64; 3]>>,
+  load_mesh_keys: Vec<Vec<[i64; 3]>>,
   load_collider_keys: Vec<[i64; 3]>,
-  chunks: Vec<Chunk>,
+  chunks: Vec<Vec<Chunk>>,
   delta_time: f32,
 }
 

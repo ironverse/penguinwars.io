@@ -13,6 +13,10 @@ impl Plugin for CustomPlugin {
 
     app
       .add_system(movement);
+
+    // For testing
+    app
+      .add_system(test_add_rigid_body);
       
   }
 }
@@ -65,7 +69,7 @@ fn add_char(
   };
   commands
     .spawn()
-    .insert(RigidBody::Dynamic)
+    .insert(RigidBody::Fixed)
     .insert(Collider::capsule_y(depth * 0.5, radius))
     .insert(Transform::from_translation(pos))
     .insert(GlobalTransform::default())
@@ -110,7 +114,7 @@ fn movement(
   if key_input.pressed(KeyCode::D) {
     direction = right;
   }
-  
+
 
   let force = 20.0;
   let mut inter_force = direction * force * time.delta_seconds();
@@ -144,6 +148,9 @@ fn get_directions(anchors: &Query<&Anchor>) -> (Vec3, Vec3) {
 }
 
 
+
+
+
 #[derive(Component)]
 pub struct Character {
   pub speed: f32,
@@ -163,3 +170,20 @@ impl Default for Character {
 
 
 
+
+
+fn test_add_rigid_body(
+  key_input: Res<Input<KeyCode>>,
+  
+  mut commands: Commands,
+  chars: Query<Entity, With<Character>>,
+) {
+  if key_input.just_pressed(KeyCode::F1) {
+    // direction = right;
+    for entity in chars.iter() {
+      info!("Add rigid body");
+      commands.entity(entity).insert(RigidBody::Dynamic);
+
+    }
+  }
+}

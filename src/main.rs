@@ -34,6 +34,7 @@ fn main() {
 /*
   TODO
     Rendered mesh disposal when out of range
+    Remove chunk data when out of range
     Bubble message in 3D world
     Player name in 3D world
 */
