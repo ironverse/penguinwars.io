@@ -191,11 +191,6 @@ fn add_colliders(
 
   time: Res<Time>,
 ) {
-  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
-  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
-    return;
-  }
-
   let keys = local_res.load_collider_keys.clone();
   for index in (0..keys.len()).rev() {
     let key = &keys[index];    
@@ -210,8 +205,6 @@ fn add_colliders(
       continue;
     }
 
-    let start = Instant::now();
-
     let data = create_collider_mesh(&chunk.octree);
     if data.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
       continue;
@@ -225,13 +218,6 @@ fn add_colliders(
       .insert(Collider::trimesh(data.positions.clone(), data.indices.clone()))
       .insert(Transform::from_xyz(pos_f32[0], pos_f32[1], pos_f32[2]) )
       .insert(GlobalTransform::default());
-
-    let duration = start.elapsed();
-    local_res.delta_time += duration.as_secs_f32();
-
-    if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
-      return;
-    }
   }
   
 }
