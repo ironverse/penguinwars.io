@@ -5,6 +5,7 @@ use bevy::{prelude::*, diagnostic::{LogDiagnosticsPlugin, FrameTimeDiagnosticsPl
 use bevy_rapier3d::{prelude::*, rapier::prelude::IntegrationParameters};
 use voxels::chunk::chunk_manager::ChunkManager;
 
+
 fn main() {
   let mut app = App::new();
   app
@@ -32,11 +33,7 @@ fn main() {
 
 /*
   TODO
-    There is a stutter when creating terrain
-      What are the possible causes?
-        Loading of data
-        Creation of mesh
-        Creation of collider
-        Initialization of colliders in bevy_rapier3d
-        Initialization of bevy for mesh
+    Rendered mesh disposal when out of range
+    Bubble message in 3D world
+    Player name in 3D world
 */

@@ -50,7 +50,7 @@ fn add_char(
 
   let handle = materials.add(
     StandardMaterial {
-      base_color: Color::rgba(0.8, 0.7, 0.6, 0.3).into(),
+      base_color: Color::rgba(0.8, 0.7, 0.6, 0.5).into(),
       alpha_mode: AlphaMode::Blend,
       ..default()
     }
