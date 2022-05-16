@@ -99,6 +99,10 @@ fn load_data(
 
       let start = Instant::now();
 
+      if *key != [-5, -1, -2] {
+        // continue;
+      }
+
       let lod = res.chunk_manager.depth - lod_index as u32;
       let chunk = res.chunk_manager.new_chunk3(key, lod as u8);
       local_res.chunks[lod_index].push(chunk);
@@ -143,12 +147,13 @@ fn add_meshes(
       local_res.load_mesh_keys[lod_index].swap_remove(index);
   
       let chunk = chunk_op.unwrap();
-      // if !is_valid_chunk(&chunk) {
-      //   // continue;
-      // }
+      if !is_valid_chunk(&chunk) {
+        continue;
+      }
       
       let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
-      if d.indices.len() != 0 { // Temporary, should be removed once the ChunkMode detection is working
+      let len = d.indices.len();
+      if len != 0 { // Temporary, should be removed once the ChunkMode detection is working
         // info!("d.indices.len() {}", d.indices.len());
         let mesh = create_mesh(&mut meshes, d.positions, d.normals, d.uvs, d.indices);
     
@@ -166,7 +171,10 @@ fn add_meshes(
           .insert(TerrainChunk {
             lod: lod
           });
+
+        // info!("add_mesh {:?} indices {}", key, len);
       }
+      
 
       let duration = start.elapsed();
       local_res.delta_time += duration.as_secs_f32();
