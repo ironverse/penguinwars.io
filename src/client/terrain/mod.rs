@@ -1,6 +1,6 @@
 use bevy::{prelude::*, utils::Instant};
 use bevy_rapier3d::{rapier::{prelude::{ColliderFlags, ColliderShape, ColliderPosition, ActiveCollisionTypes}, math::Point}, prelude::Collider};
-use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range, adjacent_keys_minmax, delta_keys_minmax}, data::{voxel_octree::{VoxelMode, VoxelOctree}, surface_nets::{get_surface_nets2}}};
+use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range, adjacent_keys_minmax, delta_keys_minmax}, data::{voxel_octree::{VoxelMode, VoxelOctree}, surface_nets::{get_surface_nets2, VoxelReuse}}};
 use crate::utils::to_key;
 use super::{GameResource, utils::create_mesh, char::Character};
 
@@ -151,7 +151,7 @@ fn add_meshes(
         continue;
       }
       
-      let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
+      let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets, &mut res.chunk_manager.voxel_reuse);
       let len = d.indices.len();
       if len != 0 { // Temporary, should be removed once the ChunkMode detection is working
         // info!("d.indices.len() {}", d.indices.len());
@@ -213,7 +213,7 @@ fn add_colliders(
       continue;
     }
 
-    let data = create_collider_mesh(&chunk.octree);
+    let data = create_collider_mesh(&chunk.octree, &mut res.chunk_manager.voxel_reuse);
     if data.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
       continue;
     }
@@ -294,8 +294,8 @@ fn remove_meshes(
 
 
 
-fn create_collider_mesh(octree: &VoxelOctree) -> MeshColliderData {
-  let mesh = get_surface_nets2(octree);
+fn create_collider_mesh(octree: &VoxelOctree, voxel_reuse: &mut VoxelReuse) -> MeshColliderData {
+  let mesh = get_surface_nets2(octree, voxel_reuse);
 
   let mut positions = Vec::new();
   let mut indices = Vec::new();
