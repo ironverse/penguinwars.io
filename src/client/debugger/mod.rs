@@ -141,11 +141,11 @@ fn update_mesh_count(
   let mut count0 = 0;
   let mut count1 = 0;
   for terrain in mesh_query.iter() {
-    if terrain.lod == 0 {
+    if terrain.lod_index == 0 {
       count0 += 1;
     }
 
-    if terrain.lod == 1 {
+    if terrain.lod_index == 1 {
       count1 += 1;
     }
   }
