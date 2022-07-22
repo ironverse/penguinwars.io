@@ -4,6 +4,8 @@ use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, a
 use crate::utils::to_key;
 use super::{GameResource, utils::create_mesh, char::Character};
 use voxels::chunk::chunk_manager::ChunkManager;
+use futures_lite::future;
+use bevy::core::FixedTimestep;
 
 const LOWEST_TIME_DELTA_LIMIT: f32 = 1.0 / 55.0;
 
@@ -23,7 +25,15 @@ impl Plugin for CustomPlugin {
       .add_system(loaded_collider_data)
       .add_system(remove_meshes)
       .add_system(remove_colliders)
+      .add_system(remove_data_cache)
       ;
+
+    app
+      .add_system_set(
+        SystemSet::new()
+          .with_run_criteria(FixedTimestep::step(1.0))
+          .with_system(log),
+    );
   }
 }
 
@@ -111,7 +121,6 @@ fn queue_chunk(
   }
 }
 
-use futures_lite::future;
 fn loaded_chunk(
   mut commands: Commands,
   mut chunk_tasks: Query<(Entity, &mut Task<ChunkData>)>,
@@ -295,7 +304,6 @@ fn remove_meshes(
           commands.entity(entity).despawn_recursive();
         }
 
-
         if index != 0 {
           if terrain_chunk.lod_index == index && in_range(&char.cur_key, &key, min) {
             commands.entity(entity).despawn_recursive();
@@ -309,46 +317,46 @@ fn remove_meshes(
   
 }
 
-
-fn load_data(
+fn remove_data_cache(
   mut local_res: ResMut<LocalResource>,
-  mut res: ResMut<GameResource>,
-  time: Res<Time>,
+  res: Res<GameResource>,
+
+  chars: Query<(&Character)>,
 ) {
-  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
-  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
-    return;
+
+  let mut player_key = [0; 3];
+  // FIXME: Should specify the player only, not other player
+  for char in chars.iter() {
+    player_key = char.cur_key.clone();
   }
-  
-  for lod_index in (0..local_res.load_keys.len()) {
-    for index in (0..local_res.load_keys[lod_index].len()).rev() {
-      let key = &local_res.load_keys[lod_index].swap_remove(index);
 
-      let start = Instant::now();
+  for lod_index in (0..local_res.chunks.len()) {
+    for index in (0..local_res.chunks[lod_index].len()).rev() {
+      // let key = local_res.load_keys[lod_index].swap_remove(index);
+      let chunk = &local_res.chunks[lod_index][index];
 
-      if *key != [-5, -1, -2] {
-        // continue;
+      let dist = res.chunk_manager.lod_dist[lod_index];
+
+      if !in_range(&player_key, &chunk.key, dist) {
+        local_res.chunks[lod_index].swap_remove(index);
       }
 
-      let lod = res.chunk_manager.depth - lod_index as u32;
-      let chunk = res.chunk_manager.new_chunk3(key, lod as u8);
-      local_res.chunks[lod_index].push(chunk);
-
-      let duration = start.elapsed();
-      local_res.delta_time += duration.as_secs_f32();
-
-      if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
-        return;
-      }
-      // info!("load_data {}", time.delta_seconds());
-    } 
+    }
   }
 }
 
 
 
-// Helper functions
+fn log(local_res: Res<LocalResource>,) {
+  let mut count = 0;
+  for index in 0..local_res.chunks.len() {
+    count += local_res.chunks[index].len();
+  }
+  println!("chunks cache count {:?}", count);
+}
 
+
+// Helper functions
 fn create_collider_mesh(octree: &VoxelOctree, voxel_reuse: &mut VoxelReuse) -> MeshColliderData {
   let mesh = get_surface_nets2(octree, voxel_reuse);
 
