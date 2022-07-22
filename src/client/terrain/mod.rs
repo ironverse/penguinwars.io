@@ -1,8 +1,11 @@
-use bevy::{prelude::*, utils::Instant};
+use bevy::{prelude::*, utils::Instant, tasks::{AsyncComputeTaskPool, Task}};
 use bevy_rapier3d::{rapier::{prelude::{ColliderFlags, ColliderShape, ColliderPosition, ActiveCollisionTypes}, math::Point}, prelude::Collider};
-use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range, adjacent_keys_minmax, delta_keys_minmax}, data::{voxel_octree::{VoxelMode, VoxelOctree}, surface_nets::{get_surface_nets2}}};
+use voxels::{chunk::{adjacent_keys_by_dist, chunk_manager::{ChunkMode, Chunk}, adjacent_keys, delta_keys, adj_delta_keys, world_pos_to_key, in_range, adjacent_keys_minmax, delta_keys_minmax}, data::{voxel_octree::{VoxelMode, VoxelOctree, MeshData}, surface_nets::{get_surface_nets2, VoxelReuse}}};
 use crate::utils::to_key;
 use super::{GameResource, utils::create_mesh, char::Character};
+use voxels::chunk::chunk_manager::ChunkManager;
+use futures_lite::future;
+use bevy::core::FixedTimestep;
 
 const LOWEST_TIME_DELTA_LIMIT: f32 = 1.0 / 55.0;
 
@@ -15,14 +18,25 @@ impl Plugin for CustomPlugin {
       .add_system_to_stage(CoreStage::First, reset_time)
       .add_system(entered_world_keys)
       .add_system(movement_delta_keys)
-      .add_system(load_data.label("load_data"))
-      .add_system(add_meshes.after("load_data"))
-      .add_system(add_colliders.after("load_data"))
+      .add_system(queue_chunk)
+      .add_system(loaded_chunk)
+      .add_system(loaded_mesh_data)
+      .add_system(queue_collider_data)
+      .add_system(loaded_collider_data)
       .add_system(remove_meshes)
       .add_system(remove_colliders)
+      .add_system(remove_data_cache)
       ;
+
+    app
+      .add_system_set(
+        SystemSet::new()
+          .with_run_criteria(FixedTimestep::step(1.0))
+          .with_system(log),
+    );
   }
 }
+
 
 fn reset_time(mut local_res: ResMut<LocalResource>) {
   local_res.delta_time = 0.0;
@@ -67,95 +81,102 @@ fn movement_delta_keys(
       let keys = delta_keys_minmax(&char.prev_key, &char.cur_key, min, max);
       local_res.load_keys[index].extend(keys.clone());
       local_res.load_mesh_keys[index].extend(keys.clone());
-
-      local_res.chunks.push(Vec::new());
     }
-
-    // let range = res.chunk_manager.lod_dist0;
-    // let keys0 = delta_keys(&char.prev_key, &char.cur_key, range);
-
-    // local_res.load_keys.extend(keys0.iter());
-    // local_res.load_mesh_keys.extend(keys0.iter());
 
     let col_keys = adj_delta_keys(&char.prev_key, &char.cur_key, 1);
     local_res.load_collider_keys.extend(col_keys.iter());
   }
 }
 
-
-fn load_data(
+fn queue_chunk(
+  mut commands: Commands, 
+  thread_pool: Res<AsyncComputeTaskPool>,
   mut local_res: ResMut<LocalResource>,
   mut res: ResMut<GameResource>,
-  time: Res<Time>,
 ) {
-  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
-  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
-    return;
-  }
-  
+
   for lod_index in (0..local_res.load_keys.len()) {
     for index in (0..local_res.load_keys[lod_index].len()).rev() {
-      let key = &local_res.load_keys[lod_index].swap_remove(index);
-
-      let start = Instant::now();
+      let key = local_res.load_keys[lod_index].swap_remove(index);
 
       let lod = res.chunk_manager.depth - lod_index as u32;
-      let chunk = res.chunk_manager.new_chunk3(key, lod as u8);
-      local_res.chunks[lod_index].push(chunk);
+      let depth = res.chunk_manager.depth;
+      let noise = res.chunk_manager.noise.clone();
 
-      let duration = start.elapsed();
-      local_res.delta_time += duration.as_secs_f32();
+      let task = thread_pool.spawn(async move {
 
-      if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
-        return;
-      }
-      // info!("load_data {}", time.delta_seconds());
-    } 
+        // Transform::from_xyz(x as f32, y as f32, z as f32)
+        let chunk = ChunkManager::new_chunk(&key, depth as u8, lod as u8, noise);
+
+        ChunkData {
+          lod_index: lod_index,
+          lod: lod as u8,
+          chunk: chunk,
+        }
+      });
+
+      // Spawn new entity and add our new task as a component
+      commands.spawn().insert(task);
+    }
   }
 }
 
-
-fn add_meshes(
+fn loaded_chunk(
   mut commands: Commands,
-  mut materials: ResMut<Assets<StandardMaterial>>,
-  mut meshes: ResMut<Assets<Mesh>>,
-
-  mut local_res: ResMut<LocalResource>,
+  mut chunk_tasks: Query<(Entity, &mut Task<ChunkData>)>,
   mut res: ResMut<GameResource>,
-  time: Res<Time>,
+  mut local_res: ResMut<LocalResource>,
+  mut meshes: ResMut<Assets<Mesh>>,
+  mut materials: ResMut<Assets<StandardMaterial>>,
+
+  thread_pool: Res<AsyncComputeTaskPool>,
+) {
+  for (entity, mut task) in chunk_tasks.iter_mut() {
+    if let Some(data) = future::block_on(future::poll_once(&mut *task)) {
+      local_res.chunks[data.lod_index].push(data.chunk.clone());
+
+      let lod_index = data.lod_index;
+      let key = data.chunk.key.clone();
+
+      // Queue MeshData
+      let mut voxel_reuse = res.chunk_manager.voxel_reuse.clone();
+      let task = thread_pool.spawn(async move {
+        MeshChunkData {
+          lod_index: lod_index,
+          key: key,
+          data: data.chunk.octree.compute_mesh2(VoxelMode::SurfaceNets, &mut voxel_reuse)
+        }
+      });
+
+      commands.spawn().insert(task);
+
+      // Task is complete, so remove task component from entity
+      commands.entity(entity).remove::<Task<ChunkData>>();
+    }
+  }
+}
+
+fn loaded_mesh_data(
+  mut commands: Commands,
+  mut chunk_tasks: Query<(Entity, &mut Task<MeshChunkData>)>,
+  mut res: ResMut<GameResource>,
+  mut local_res: ResMut<LocalResource>,
+  mut meshes: ResMut<Assets<Mesh>>,
+  mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
 
-  if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT
-  || time.delta_seconds() >= LOWEST_TIME_DELTA_LIMIT {
-    return;
-  }
+  for (entity, mut task) in chunk_tasks.iter_mut() {
+    if let Some(mc_data) = future::block_on(future::poll_once(&mut *task)) {
+      let lod_index = mc_data.lod_index;
+      let data = mc_data.data;
 
-  for lod_index in (0..local_res.load_mesh_keys.len()) {
-    for index in (0..local_res.load_mesh_keys[lod_index].len()).rev() {
-      let start = Instant::now();
-
-      // info!("index {}", index);
-      let key = &local_res.load_mesh_keys[lod_index][index].clone();
-      let chunk_op = get_chunk(key, &local_res.chunks[lod_index]);
-      if chunk_op.is_none() {
-        continue;
-      }
-      local_res.load_mesh_keys[lod_index].swap_remove(index);
-  
-      let chunk = chunk_op.unwrap();
-      // if !is_valid_chunk(&chunk) {
-      //   // continue;
-      // }
-      
-      let d = chunk.octree.compute_mesh2(VoxelMode::SurfaceNets);
-      if d.indices.len() != 0 { // Temporary, should be removed once the ChunkMode detection is working
-        // info!("d.indices.len() {}", d.indices.len());
-        let mesh = create_mesh(&mut meshes, d.positions, d.normals, d.uvs, d.indices);
+      let len = data.indices.len();
+      if len != 0 { // Temporary, should be removed once the ChunkMode detection is working
+        let mesh = create_mesh(&mut meshes, data.positions, data.normals, data.uvs, data.indices);
     
         let seamless_size = res.chunk_manager.seamless_size();
-        let coord_f32 = key_to_world_coord_f32(key, seamless_size);
-    
-        let lod = lod_index as u8;
+        let coord_f32 = key_to_world_coord_f32(&mc_data.key, seamless_size);
+
         commands
           .spawn_bundle(PbrBundle {
             mesh: mesh,
@@ -164,37 +185,27 @@ fn add_meshes(
             ..Default::default()
           })
           .insert(TerrainChunk {
-            lod: lod
+            lod_index: lod_index
           });
       }
 
-      let duration = start.elapsed();
-      local_res.delta_time += duration.as_secs_f32();
 
-      if local_res.delta_time >= LOWEST_TIME_DELTA_LIMIT {
-        return;
-      }
-      
+      // Task is complete, so remove task component from entity
+      commands.entity(entity).remove::<Task<MeshChunkData>>();
     }
   }
-
-  
 }
 
-fn add_colliders(
+fn queue_collider_data(
   mut commands: Commands,
-  mut materials: ResMut<Assets<StandardMaterial>>,
-  mut meshes: ResMut<Assets<Mesh>>,
-
   mut local_res: ResMut<LocalResource>,
   mut res: ResMut<GameResource>,
-
-  time: Res<Time>,
+  thread_pool: Res<AsyncComputeTaskPool>,
 ) {
   let keys = local_res.load_collider_keys.clone();
   for index in (0..keys.len()).rev() {
-    let key = &keys[index];    
-    let chunk_op = get_chunk(key, &local_res.chunks[0]);
+    let key = keys[index];    
+    let chunk_op = get_chunk(&key, &local_res.chunks[0]);
     if chunk_op.is_none() {
       continue;
     }
@@ -205,22 +216,49 @@ fn add_colliders(
       continue;
     }
 
-    let data = create_collider_mesh(&chunk.octree);
-    if data.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
-      continue;
-    }
-
-    let seamless_size = res.chunk_manager.seamless_size();
-    let pos_f32 = key_to_world_coord_f32(key, seamless_size);
-
-    commands
-      .spawn()
-      .insert(Collider::trimesh(data.positions.clone(), data.indices.clone()))
-      .insert(Transform::from_xyz(pos_f32[0], pos_f32[1], pos_f32[2]) )
-      .insert(GlobalTransform::default());
+    let mut voxel_reuse = res.chunk_manager.voxel_reuse.clone();
+    let task = thread_pool.spawn(async move {
+      let data = create_collider_mesh(&chunk.octree, &mut voxel_reuse);
+      
+      ColliderData {
+        key: key.clone(),
+        data: data,
+      }
+    });
+    commands.spawn().insert(task);
   }
-  
 }
+
+fn loaded_collider_data(
+  mut commands: Commands,
+  mut chunk_tasks: Query<(Entity, &mut Task<ColliderData>)>,
+
+  mut res: ResMut<GameResource>,
+) {
+  for (entity, mut task) in chunk_tasks.iter_mut() {
+    if let Some(c_data) = future::block_on(future::poll_once(&mut *task)) {
+      commands.entity(entity).remove::<Task<ColliderData>>();
+
+      let key = c_data.key;
+      let data = c_data.data;
+
+      if data.indices.len() == 0 { // Temporary, should be removed once the ChunkMode detection is working
+        continue;
+      }
+
+      let seamless_size = res.chunk_manager.seamless_size();
+      let pos_f32 = key_to_world_coord_f32(&key, seamless_size);
+
+      commands
+        .spawn()
+        .insert(Collider::trimesh(data.positions.clone(), data.indices.clone()))
+        .insert(Transform::from_xyz(pos_f32[0], pos_f32[1], pos_f32[2]) )
+        .insert(GlobalTransform::default());
+    }
+  }
+}
+
+
 
 fn remove_colliders(
   res: Res<GameResource>,
@@ -261,14 +299,13 @@ fn remove_meshes(
         let min = if index == 0 { 0 } else { res.chunk_manager.lod_dist[index - 1] };
         let max = dist;
 
-        if terrain_chunk.lod == index as u8 && 
+        if terrain_chunk.lod_index == index && 
         !in_range(&char.cur_key, &key, *max) {
           commands.entity(entity).despawn_recursive();
         }
 
-
         if index != 0 {
-          if terrain_chunk.lod == index as u8 && in_range(&char.cur_key, &key, min) {
+          if terrain_chunk.lod_index == index && in_range(&char.cur_key, &key, min) {
             commands.entity(entity).despawn_recursive();
           }
         }
@@ -280,14 +317,48 @@ fn remove_meshes(
   
 }
 
+fn remove_data_cache(
+  mut local_res: ResMut<LocalResource>,
+  res: Res<GameResource>,
+
+  chars: Query<(&Character)>,
+) {
+
+  let mut player_key = [0; 3];
+  // FIXME: Should specify the player only, not other player
+  for char in chars.iter() {
+    player_key = char.cur_key.clone();
+  }
+
+  for lod_index in (0..local_res.chunks.len()) {
+    for index in (0..local_res.chunks[lod_index].len()).rev() {
+      // let key = local_res.load_keys[lod_index].swap_remove(index);
+      let chunk = &local_res.chunks[lod_index][index];
+
+      let dist = res.chunk_manager.lod_dist[lod_index];
+
+      if !in_range(&player_key, &chunk.key, dist) {
+        local_res.chunks[lod_index].swap_remove(index);
+      }
+
+    }
+  }
+}
 
 
 
+fn log(local_res: Res<LocalResource>,) {
+  let mut count = 0;
+  for index in 0..local_res.chunks.len() {
+    count += local_res.chunks[index].len();
+  }
+  println!("chunks cache count {:?}", count);
+}
 
 
-
-fn create_collider_mesh(octree: &VoxelOctree) -> MeshColliderData {
-  let mesh = get_surface_nets2(octree);
+// Helper functions
+fn create_collider_mesh(octree: &VoxelOctree, voxel_reuse: &mut VoxelReuse) -> MeshColliderData {
+  let mesh = get_surface_nets2(octree, voxel_reuse);
 
   let mut positions = Vec::new();
   let mut indices = Vec::new();
@@ -365,7 +436,22 @@ pub struct MeshColliderData {
 
 #[derive(Component)]
 pub struct TerrainChunk {
-  pub lod: u8
+  pub lod_index: usize
 }
 
+pub struct ChunkData {
+  pub lod_index: usize,
+  pub lod: u8,
+  pub chunk: Chunk
+}
 
+pub struct MeshChunkData {
+  pub lod_index: usize,
+  pub key: [i64; 3],
+  pub data: MeshData
+}
+
+pub struct ColliderData {
+  pub key: [i64; 3],
+  pub data: MeshColliderData
+}
