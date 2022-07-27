@@ -79,7 +79,7 @@ fn mesh_count_text(mut commands: Commands, asset_server: Res<AssetServer>) {
       },
     ),
     ..default()
-})
+  })
   .insert(MeshCountText);
 }
 

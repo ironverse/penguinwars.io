@@ -1,11 +1,14 @@
 use bevy::prelude::*;
 use super::{camera::CameraSettings, char::Character};
 
+mod bubble;
+mod utils;
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
+      .add_plugin(bubble::CustomPlugin)
       .add_startup_system(startup)
       .add_system_to_stage(CoreStage::First, update); // Need to be first to remove positioning stutter
   }
