@@ -2,6 +2,7 @@ pub mod style;
 
 use bevy_egui::egui;
 use bevy_egui::egui::Frame;
+use bevy_egui::egui::Pos2;
 use bevy_egui::egui::Rect;
 use bevy_egui::egui::Ui;
 use bevy_egui::egui::WidgetText;
@@ -21,13 +22,15 @@ pub fn new_window(
 ) {
   let mut e: Window = egui::Window::new(WidgetText::from(title.to_string().as_str()));
 
-  let test = s.testing(AUTH_PANEL_MIN);
-
   e.title_bar(false)
     .frame(frame)
     .fixed_rect(Rect {
       min: s.xy(AUTH_PANEL_MIN).into(),
       max: s.xy(AUTH_PANEL_MAX).into(),
+    })
+    .current_pos(Pos2 {
+      x: 0.0,
+      y: 0.0
     })
     .show(ctx, |ui| {
       ui.set_min_height(s.y(AUTH_PANEL_MAX[1] - AUTH_PANEL_MIN[1]).into());

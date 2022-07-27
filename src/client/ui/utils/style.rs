@@ -153,10 +153,4 @@ impl Scaler {
   pub fn font(&self, size: f32) -> f32 {
     return self.y(size * FONT_SCALE);
   }
-
-  pub fn testing(&self, widget_size: [f32; 2]) -> [f32; 2] {
-    let x_ratio = self.screen_size[0] / self.reference_size[0];
-    let y_ratio = self.screen_size[1] / self.reference_size[1];
-    [widget_size[0] * x_ratio, widget_size[1] * y_ratio]
-  }
 }
