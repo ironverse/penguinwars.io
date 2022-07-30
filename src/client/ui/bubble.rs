@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContext, EguiSettings};
+use bevy_egui::{egui::{self, Pos2}, EguiContext, EguiSettings};
 
 use crate::client::{char::Character, camera::CameraSettings};
 
@@ -37,19 +37,20 @@ impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_startup_system(startup)
-      .add_system_to_stage(CoreStage::First, update)
+      .add_system_to_stage(CoreStage::First, update) // Need to be first to remove positioning stutter
       .add_system(update_bubble)
-      ; // Need to be first to remove positioning stutter
+      ; 
   }
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
   let font = asset_server.load("fonts/FiraSans-Bold.ttf");
+
   commands
     .spawn_bundle(TextBundle {
       style: Style {
-        align_self: AlignSelf::FlexEnd,
-        position_type: PositionType::Absolute,
+        // align_self: AlignSelf::FlexEnd,
+        // position_type: PositionType::Absolute,
         position: Rect {
           bottom: Val::Px(5.0),
           left: Val::Px(15.0),
@@ -63,10 +64,11 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
       },
       text: Text::with_section(
         "Player Name".to_string(),
+        // "Player Name Player Name Player Name Player Name Player Name Player Name".to_string(),
         TextStyle {
-          font,
+          font: font.clone_weak(),
           font_size: 20.0,
-          color: Color::WHITE,
+          color: Color::BLUE,
         },
         TextAlignment {
           ..Default::default()
@@ -76,6 +78,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     })
     .insert(FollowText);
 }
+
 
 fn update(
   windows: Res<Windows>,
@@ -108,34 +111,102 @@ use bevy_egui::egui::{Frame, Color32};
 
 use super::utils::{new_window, style::setup_style};
 fn update_bubble(
+  windows: Res<Windows>,
+  images: ResMut<Assets<Image>>,
+  cam_query: Query<(&Camera, &GlobalTransform), With<CameraSettings>>,
+  char_query: Query<&Transform, With<Character>>,
+
+
+
   mut ctx: ResMut<EguiContext>,
   mut rendered_texture_id: Local<egui::TextureId>,
   mut local: Local<Cache>,
-  images: Local<Images>,
+  local_images: Local<Images>,
 ) {
 
   if !local.initilized {
     local.initilized = true;
-    *rendered_texture_id = ctx.add_image(images.bubble.clone_weak());
+    *rendered_texture_id = ctx.add_image(local_images.bubble.clone_weak());
   }
 
-  let s = setup_style(ctx.ctx_mut());
-  // set_background_galaxy(ctx.ctx_mut(), &s);
+  let player_height = 1.0;
+  let mut x = 0.0;
+  let mut y = 0.0;
+  for (cam, cam_transform) in cam_query.iter() {
+    for char_transform in char_query.iter() {
+      let translation = char_transform.translation + Vec3::new(0.0, player_height, 0.0);
 
-  //panel
-  let frame = Frame {
-    fill: Color32::from_rgba_unmultiplied(76, 67, 82, 00),
-    ..Default::default()
-  };
+      match cam.world_to_screen(&windows, &images, cam_transform, translation) {
+        Some(coords) => {
+          x = coords.x;
 
-  new_window(ctx.ctx_mut(), &s, "Game Window", frame, |ui| {
-    let image = egui::widgets::Image::new(
-      *rendered_texture_id,
-      [256.0, 256.0],
-    );
+          let mid = windows.get_primary().unwrap().height() / 2.0;
+          let difY = mid - coords.y;
+          y = mid + difY;
+        }
+        None => {
 
-    ui.add(image);
-  });
+        }
+      }
+
+      let win_height = windows.get_primary().unwrap().height();
+
+      let s = setup_style(ctx.ctx_mut());
+      // set_background_galaxy(ctx.ctx_mut(), &s);
+
+      //panel
+      let frame = Frame {
+        fill: Color32::from_rgba_premultiplied(76, 67, 82, 127),
+        ..Default::default()
+      };
+
+      let width = 200.0;
+      let height = 100.0;
+
+      let left = x - width * 0.5;
+      let bottom = y - height;
+      let pos = Pos2::new(left, bottom);
+      let size = egui::Rect::from_min_size(Pos2::new(0.0, 0.0), egui::Vec2::new(width, height));
+
+      new_window(ctx.ctx_mut(), &s, "Bubble Image", frame, pos, size, |ui| {
+        ui.add(egui::widgets::Image::new(
+          *rendered_texture_id,
+          [width, height],
+        ));
+      });
+
+      // let text_size = egui::Vec2::new(width - 10.0, height - 10.0);
+      let text_size = egui::Vec2::new(170.0, 70.0);
+      let text_rect = egui::Rect::from_min_size(Pos2::new(0.0, 0.0), text_size);
+
+      let text_adj_x = text_size.x * 0.5;
+      let text_adj_y = text_size.y + win_height * -0.1325;
+      let text_x = x - text_size.x + text_adj_x;
+      let text_y = y - text_size.y + text_adj_y; 
+      let text_pos = egui::Pos2::new(text_x, text_y);
+
+      let text_frame = Frame {
+        fill: Color32::from_rgba_premultiplied(0, 0, 0, 127),
+        ..Default::default()
+      };
+      new_window(ctx.ctx_mut(), &s, "Bubble Text", text_frame, text_pos, text_rect, |ui| {
+        // ui.label("Testing");
+
+        // let text = "Long text";
+        // let text = "Long text Long text Long text Long text Long text Long text";
+        let text = "Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text";
+        ui.add_sized(text_size, 
+          egui::Label::new(egui::RichText::new(text).color(Color32::BLACK)
+        ));
+      });
+
+    }
+  }
+
+
+
+
+  
 }
 
 

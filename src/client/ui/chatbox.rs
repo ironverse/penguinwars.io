@@ -36,17 +36,17 @@ fn ui_example(mut ctx: ResMut<EguiContext>) {
     ..Default::default()
   };
 
-  new_window(ctx.ctx_mut(), &s, "signup_window", frame, |ui| {
-    //panel contents
-    ui.vertical_centered(|ui| {
-      ui.add_space(s.y(30.0));
-      //heading
-      ui.heading("Create Your Ironverse Account");
+  // new_window(ctx.ctx_mut(), &s, "signup_window", frame, |ui| {
+  //   //panel contents
+  //   ui.vertical_centered(|ui| {
+  //     ui.add_space(s.y(30.0));
+  //     //heading
+  //     ui.heading("Create Your Ironverse Account");
 
 
-      // ui.image(texture_id, size)
-    });
-  });
+  //     // ui.image(texture_id, size)
+  //   });
+  // });
 
   // egui::Window::new("Window")
   //   .vscroll(true)

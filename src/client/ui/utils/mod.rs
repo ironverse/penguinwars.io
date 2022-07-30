@@ -13,27 +13,26 @@ use self::style::Scaler;
 pub const AUTH_PANEL_MIN: [f32; 2] = [600.0, 305.0];
 pub const AUTH_PANEL_MAX: [f32; 2] = [1320.0, 774.0];
 
+pub const SIZE_MIN: [f32; 2] = [100.0, 50.0];
+pub const SIZE_MAX: [f32; 2] = [1920.0, 1080.0];
+
 pub fn new_window(
   ctx: &egui::Context,
   s: &Scaler,
   title: impl ToString,
   frame: Frame,
+  pos: Pos2,
+  size: Rect,
   add_contents: impl FnOnce(&mut Ui),
 ) {
   let mut e: Window = egui::Window::new(WidgetText::from(title.to_string().as_str()));
 
   e.title_bar(false)
     .frame(frame)
-    .fixed_rect(Rect {
-      min: s.xy(AUTH_PANEL_MIN).into(),
-      max: s.xy(AUTH_PANEL_MAX).into(),
-    })
-    .current_pos(Pos2 {
-      x: 0.0,
-      y: 0.0
-    })
+    .fixed_rect(size)
+    .current_pos(pos)
     .show(ctx, |ui| {
-      ui.set_min_height(s.y(AUTH_PANEL_MAX[1] - AUTH_PANEL_MIN[1]).into());
+      // ui.set_min_height(s.y(AUTH_PANEL_MAX[1] - AUTH_PANEL_MIN[1]).into());
       add_contents(ui);
     });
 }
