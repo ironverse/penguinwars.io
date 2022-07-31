@@ -119,7 +119,6 @@ fn show_update(
 
   if res.show {
     if res.timer.tick(time.delta()).finished() {
-      println!("Hide");
       res.show = false;
     }
   }

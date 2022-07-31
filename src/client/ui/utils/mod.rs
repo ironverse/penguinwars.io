@@ -32,6 +32,30 @@ pub fn new_window(
     .fixed_rect(size)
     .current_pos(pos)
     .show(ctx, |ui| {
+      ui.set_width(size.width());
+      ui.set_height(size.height());
+      // ui.set_min_height(s.y(AUTH_PANEL_MAX[1] - AUTH_PANEL_MIN[1]).into());
+      add_contents(ui);
+    });
+}
+
+pub fn history_window(
+  ctx: &egui::Context,
+  s: &Scaler,
+  title: impl ToString,
+  frame: Frame,
+  pos: Pos2,
+  size: Rect,
+  add_contents: impl FnOnce(&mut Ui),
+) {
+  let mut e: Window = egui::Window::new(WidgetText::from(title.to_string().as_str()));
+
+  e.title_bar(false)
+    .frame(frame)
+    .fixed_rect(size)
+    .current_pos(pos)
+    .vscroll(true)
+    .show(ctx, |ui| {
       // ui.set_min_height(s.y(AUTH_PANEL_MAX[1] - AUTH_PANEL_MIN[1]).into());
       add_contents(ui);
     });
