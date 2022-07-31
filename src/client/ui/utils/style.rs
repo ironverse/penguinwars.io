@@ -14,6 +14,12 @@ const SUE_ELLEN_FRANCISCO_FONT: Cow<[u8]> = Cow::Borrowed(include_bytes!(
 const ARIMO_REGULAR_FONT: Cow<[u8]> =
   Cow::Borrowed(include_bytes!("../../../../assets/fonts/Arimo-Regular.ttf"));
 
+const FIRASANS_BOLD: Cow<[u8]> =
+  Cow::Borrowed(include_bytes!("../../../../assets/fonts/FiraSans-Bold.ttf"));
+
+const FIRAMONO_MEDIUM: Cow<[u8]> =
+  Cow::Borrowed(include_bytes!("../../../../assets/fonts/FiraMono-Medium.ttf"));
+
 const REFERENCE_SIZE: [f32; 2] = [1920.0, 1080.0];
 const FONT_SCALE: f32 = 1.20;
 
@@ -37,6 +43,56 @@ pub fn setup_style(ctx: &egui::Context) -> Scaler {
       index: 0,
       tweak: FontTweak::default(),
     });
+
+  fd.font_data
+    .entry("FiraSans_Bold".into())
+    .or_insert(FontData {
+      font: FIRASANS_BOLD,
+      index: 0,
+      tweak: FontTweak::default(),
+    });
+  
+  fd.font_data
+    .entry("Medium".into())
+    .or_insert(FontData {
+      font: FIRAMONO_MEDIUM,
+      index: 0,
+      tweak: FontTweak::default(),
+    });
+  // fd.font_data
+  //   .insert("Medium".into(),
+  //     FontData::from_static(include_bytes!("../../../../assets/fonts/FiraMono-Medium.ttf"))
+  //   );
+
+  fd.families
+    .insert(Monospace, vec![
+      "Monospace".into(),
+      // "Medium".into()
+    ]);
+
+  fd.families
+    .insert(Proportional, vec!["Proportional".into()]);
+  // fd.families
+  //   .insert(egui::FontFamily::Name("Medium".into()), vec!["Medium".into()]); // NOT WORKING
+    
+  // for fd in fd.font_data.iter() {
+  //   println!("fd {:?}", fd.0);
+  // }
+  
+  // for fam in fd.families.iter() {
+  //   println!("fam {:?}", fam.0);
+  // }
+
+  // fd.families
+  //   .insert(TextStyle::Heading, (Proportional, s.font(36.0)));
+  // fd.families
+  //   .insert(TextStyle::Button, (Proportional, s.font(28.0)));
+  // fd.families
+  //   .insert(TextStyle::Body, (Proportional, s.font(20.0)));
+  // fd.families
+  //   .insert(TextStyle::Small, (Proportional, s.font(16.0)));
+
+
   // fd.fonts_for_family
   //   .insert(Monospace, vec!["Monospace".into()]);
   // fd.fonts_for_family

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
-use bevy_egui::{egui::{self, Pos2}, EguiContext, EguiSettings};
+use bevy_egui::{egui::{self, Pos2, FontId}, EguiContext, EguiSettings};
 use bevy_egui::egui::{Frame, Color32};
-use super::{utils::{new_window, style::setup_style}};
+use super::{utils::{new_window, style::setup_style}, chatbox::ChatEvent};
 use crate::client::{char::Character, camera::CameraSettings};
 
 struct Images {
@@ -35,6 +35,9 @@ struct FollowText;
 
 pub struct BubbleResource {
   pub text: String,
+  timer: Timer,
+  alpha: u8,
+  show: bool,
 }
 
 pub struct CustomPlugin;
@@ -42,11 +45,15 @@ impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
       .insert_resource(BubbleResource {
-        text: "".to_string(),
+        text: "Message".to_string(),
+        timer: Timer::from_seconds(3.0, false),
+        alpha: 0,
+        show: false,
       })
       .add_startup_system(startup)
       .add_system_to_stage(CoreStage::First, update) // Need to be first to remove positioning stutter
       .add_system(update_bubble)
+      .add_system(show_update)
       ; 
   }
 }
@@ -88,6 +95,41 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 
+fn show_update(
+  mut res: ResMut<BubbleResource>,
+  time: Res<Time>,
+  mut chat_events: EventReader<ChatEvent>
+) {
+  for e in chat_events.iter() {
+    res.text = e.text.to_string();
+    res.timer.reset();
+    res.show = true;
+    res.alpha = 255;
+  }
+
+  let alpha_reduction = 2;
+  if !res.show && res.alpha >= alpha_reduction {
+    res.alpha -= alpha_reduction;
+  }
+
+  if !res.show && res.alpha == 0 {
+    res.text = "".to_string();
+  }
+
+
+  if res.show {
+    if res.timer.tick(time.delta()).finished() {
+      println!("Hide");
+      res.show = false;
+    }
+  }
+
+  
+  
+}
+
+
+
 fn update(
   windows: Res<Windows>,
   images: ResMut<Assets<Image>>,
@@ -120,7 +162,7 @@ fn update_bubble(
   images: ResMut<Assets<Image>>,
   cam_query: Query<(&Camera, &GlobalTransform), With<CameraSettings>>,
   char_query: Query<&Transform, With<Character>>,
-  bubble_res: Res<BubbleResource>,
+  res: Res<BubbleResource>,
 
 
   mut ctx: ResMut<EguiContext>,
@@ -157,11 +199,10 @@ fn update_bubble(
       let win_height = windows.get_primary().unwrap().height();
 
       let s = setup_style(ctx.ctx_mut());
-      // set_background_galaxy(ctx.ctx_mut(), &s);
 
       //panel
       let frame = Frame {
-        fill: Color32::from_rgba_premultiplied(76, 67, 82, 127),
+        fill: Color32::from_rgba_unmultiplied(0, 0, 0, 0),
         ..Default::default()
       };
 
@@ -177,7 +218,9 @@ fn update_bubble(
         ui.add(egui::widgets::Image::new(
           *rendered_texture_id,
           [width, height],
-        ));
+        )
+        .tint(Color32::from_rgba_unmultiplied(255, 255, 255, res.alpha))
+        );
       });
 
       // let text_size = egui::Vec2::new(width - 10.0, height - 10.0);
@@ -191,12 +234,25 @@ fn update_bubble(
       let text_pos = egui::Pos2::new(text_x, text_y);
 
       let text_frame = Frame {
-        fill: Color32::from_rgba_premultiplied(0, 0, 0, 127),
+        fill: Color32::from_rgba_premultiplied(0, 0, 0, 0),
         ..Default::default()
       };
+
+      // println!("--------");
+      // for fam in ctx.ctx_mut().fonts().families().iter() {
+      //   println!("{:?}", fam);
+      // }
       new_window(ctx.ctx_mut(), &s, "Bubble Text", text_frame, text_pos, text_rect, |ui| {
         ui.add_sized(text_size, 
-          egui::Label::new(egui::RichText::new(bubble_res.text.to_string()).color(Color32::BLACK)
+          egui::Label::new(
+            egui::RichText::new(res.text.to_string())
+              .font(FontId {
+                size: 15.0,
+                // family: egui::FontFamily::Name("Medium".into())
+                family: egui::FontFamily::Proportional,
+              })
+              .color(Color32::from_rgba_premultiplied(0, 0, 0, res.alpha)
+          )
         ));
       });
 
