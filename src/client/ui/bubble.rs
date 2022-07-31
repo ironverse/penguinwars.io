@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_egui::{egui::{self, Pos2}, EguiContext, EguiSettings};
-
+use bevy_egui::egui::{Frame, Color32};
+use super::{utils::{new_window, style::setup_style}};
 use crate::client::{char::Character, camera::CameraSettings};
 
 struct Images {
@@ -32,10 +33,17 @@ impl Default for Cache {
 struct FollowText;
 
 
+pub struct BubbleResource {
+  pub text: String,
+}
+
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
   fn build(&self, app: &mut App) {
     app
+      .insert_resource(BubbleResource {
+        text: "".to_string(),
+      })
       .add_startup_system(startup)
       .add_system_to_stage(CoreStage::First, update) // Need to be first to remove positioning stutter
       .add_system(update_bubble)
@@ -107,15 +115,12 @@ fn update(
   }
 }
 
-use bevy_egui::egui::{Frame, Color32};
-
-use super::utils::{new_window, style::setup_style};
 fn update_bubble(
   windows: Res<Windows>,
   images: ResMut<Assets<Image>>,
   cam_query: Query<(&Camera, &GlobalTransform), With<CameraSettings>>,
   char_query: Query<&Transform, With<Character>>,
-
+  bubble_res: Res<BubbleResource>,
 
 
   mut ctx: ResMut<EguiContext>,
@@ -190,13 +195,8 @@ fn update_bubble(
         ..Default::default()
       };
       new_window(ctx.ctx_mut(), &s, "Bubble Text", text_frame, text_pos, text_rect, |ui| {
-        // ui.label("Testing");
-
-        // let text = "Long text";
-        // let text = "Long text Long text Long text Long text Long text Long text";
-        let text = "Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text";
         ui.add_sized(text_size, 
-          egui::Label::new(egui::RichText::new(text).color(Color32::BLACK)
+          egui::Label::new(egui::RichText::new(bubble_res.text.to_string()).color(Color32::BLACK)
         ));
       });
 
