@@ -12,6 +12,8 @@ const WIDTH: f32 = 500.0;
 const NAME_LIMIT: usize = 20;
 const MSG_LIMIT: usize  = 200;
 
+const BLANK: &str = "                                                                                                                                                                                                                    ";
+
 
 pub struct ChatResource {
   pub text: String,
@@ -32,15 +34,11 @@ pub struct HistoryData {
 
 impl HistoryData {
   pub fn new(mut name: String, mut msg: String) -> Self {
-    let name_limit = 20;
-    let msg_limit = 200;
+    name.push_str(BLANK);
+    msg.push_str(BLANK);
 
     name.truncate(NAME_LIMIT);
     msg.truncate(MSG_LIMIT);
-
-    // if name.len() < NAME_LIMIT {
-    //   name.
-    // }
 
     Self { name: name, msg: msg }
   }
@@ -79,6 +77,8 @@ mod tests {
     Ok(())
   }
 }
+
+
 
 pub struct CustomPlugin;
 impl Plugin for CustomPlugin {
@@ -238,16 +238,16 @@ fn history(
         let adj_x = 16.0;
         ui.horizontal(|ui| {
 
-          ui.add_sized(name_size, 
-            egui::Label::new(
-              egui::RichText::new(data.name.clone())
-                .font(egui::FontId {
-                  size: 15.0,
-                  family: egui::FontFamily::Proportional,
-                })
-                .color(Color32::from_rgba_premultiplied(255, 255, 255, 255))
-            )
-          );
+          // ui.add_sized(name_size, 
+          //   egui::Label::new(
+          //     egui::RichText::new(data.name.clone())
+          //       .font(egui::FontId {
+          //         size: 15.0,
+          //         family: egui::FontFamily::Proportional,
+          //       })
+          //       .color(Color32::from_rgba_premultiplied(255, 255, 255, 255))
+          //   )
+          // );
 
           let r = ui.label(
             egui::RichText::new(data.msg.clone())
