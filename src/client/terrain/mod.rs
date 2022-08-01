@@ -352,7 +352,7 @@ fn log(local_res: Res<LocalResource>,) {
   for index in 0..local_res.chunks.len() {
     count += local_res.chunks[index].len();
   }
-  println!("chunks cache count {:?}", count);
+  // println!("chunks cache count {:?}", count);
 }
 
 
