@@ -66,8 +66,7 @@ pub fn setup_style(ctx: &egui::Context) -> Scaler {
 
   fd.families
     .insert(Monospace, vec![
-      "Monospace".into(),
-      // "Medium".into()
+      "Medium".into(),
     ]);
 
   fd.families

@@ -7,10 +7,10 @@ use super::utils::history_window;
 use super::utils::{style::setup_style, new_window};
 
 const HISTORY_LIMIT: usize = 10;
-const WIDTH: f32 = 500.0;
+const WIDTH: f32 = 600.0;
 
-const NAME_LIMIT: usize = 20;
-const MSG_LIMIT: usize  = 200;
+const NAME_LIMIT: usize = 10;
+const MSG_LIMIT: usize  = 60;
 
 const BLANK: &str = "                                                                                                                                                                                                                    ";
 
@@ -54,7 +54,6 @@ mod tests {
     let msg = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Dictumst vestibulum rhoncus est pellentesque elit. Vitae congue eu consequat ac felis donec et odio. Tincidunt praesent semper feugiat nibh sed pulvinar proin. Diam sit amet nisl suscipit adipiscing bibendum. Non odio euismod lacinia at quis risus sed vulputate. Suscipit tellus mauris a diam maecenas sed enim ut. Tellus elementum sagittis vitae et leo duis ut diam. Aenean vel elit scelerisque mauris pellentesque pulvinar. Lacus viverra vitae congue eu consequat ac felis donec. Phasellus vestibulum lorem sed risus ultricies tristique nulla aliquet enim. Eget nullam non nisi est sit amet. Purus faucibus ornare suspendisse sed nisi lacus sed. Egestas erat imperdiet sed euismod nisi porta lorem. Risus at ultrices mi tempus imperdiet nulla malesuada. Odio eu feugiat pretium nibh ipsum consequat. Tellus integer feugiat scelerisque varius.";
 
     let data = HistoryData::new(name.into(), msg.into());
-
     assert_eq!(data.name.len(), NAME_LIMIT);
     assert_eq!(data.msg.len(), MSG_LIMIT);
     Ok(())
@@ -66,12 +65,6 @@ mod tests {
     let msg = "asdfadf";
 
     let data = HistoryData::new(name.into(), msg.into());
-
-    let append_count = NAME_LIMIT - name.len();
-    for i in 0..append_count {
-
-    }
-
     assert_eq!(data.name.len(), NAME_LIMIT);
     assert_eq!(data.msg.len(), MSG_LIMIT);
     Ok(())
@@ -86,13 +79,12 @@ impl Plugin for CustomPlugin {
     app
       .insert_resource(ChatResource {
         is_chat_mode: false,
-        text: "           ".to_string(),
+        text: "".to_string(),
         history: vec![HistoryData::default(); HISTORY_LIMIT],
         scroll_to_last_msg: false,
       })
       .add_event::<ChatEvent>()
       .add_startup_system(startup)
-      // .add_system(ui_example)
       .add_system(key_events)
       .add_system(chat_box)
       .add_system(history);
@@ -121,7 +113,7 @@ fn key_events(
       if chat_res.history.len() > HISTORY_LIMIT {
         chat_res.history.remove(0);
       }
-      chat_res.history.push(HistoryData { name: msg.clone(), msg: msg.clone() });
+      chat_res.history.push(HistoryData::new(msg.clone(), msg.clone()));
 
 
       chat_res.text = "".to_string();
@@ -235,25 +227,22 @@ fn history(
         // }
         
         let name_size = egui::Vec2::new(50.0, text_size.y);
-        let adj_x = 16.0;
         ui.horizontal(|ui| {
+          let r = ui.label(
+            egui::RichText::new(data.name.clone())
+              .font(egui::FontId {
+                size: 15.0,
+                family: egui::FontFamily::Monospace,
+              })
+              .color(Color32::from_rgba_premultiplied(255, 255, 255, 255))
+          );
 
-          // ui.add_sized(name_size, 
-          //   egui::Label::new(
-          //     egui::RichText::new(data.name.clone())
-          //       .font(egui::FontId {
-          //         size: 15.0,
-          //         family: egui::FontFamily::Proportional,
-          //       })
-          //       .color(Color32::from_rgba_premultiplied(255, 255, 255, 255))
-          //   )
-          // );
 
           let r = ui.label(
             egui::RichText::new(data.msg.clone())
               .font(egui::FontId {
                 size: 15.0,
-                family: egui::FontFamily::Proportional,
+                family: egui::FontFamily::Monospace,
               })
               .color(Color32::from_rgba_premultiplied(255, 255, 255, 255))
           );

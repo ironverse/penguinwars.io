@@ -10,6 +10,13 @@ fn main() {
   let mut app = App::new();
   app
     .insert_resource(Msaa { samples: 4 })
+    .insert_resource(WindowDescriptor {
+      title: "Penguin Wars".to_string(),
+      width: 1280.,
+      height: 720.,
+      // present_mode: PresentMode::AutoVsync,
+      ..default()
+    })
     .add_plugins(DefaultPlugins)
     .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
     // .add_plugin(LogDiagnosticsPlugin::default())
