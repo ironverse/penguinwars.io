@@ -56,6 +56,10 @@ pub fn history_window(
     .current_pos(pos)
     .vscroll(true)
     .show(ctx, |ui| {
+      ui.set_width(size.width());
+      // ui.set_max_width(400.0);
+      // ui.set_height(size.height());
+
       // ui.set_min_height(s.y(AUTH_PANEL_MAX[1] - AUTH_PANEL_MIN[1]).into());
       add_contents(ui);
     });
