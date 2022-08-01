@@ -105,7 +105,8 @@ fn key_events(
 ) {
   if keyboard_input.just_pressed(KeyCode::Return) {
     if chat_res.text.len() > 0 {
-      let msg = chat_res.text.to_string();
+      let mut msg = chat_res.text.to_string();
+      msg.truncate(MSG_LIMIT);
       chat_events.send(ChatEvent {
         text: msg.clone(),
       });
